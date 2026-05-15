@@ -10,7 +10,26 @@ workflows:
         APP_ID: com.kusetty.convention_hall_manager
     scripts:
       - flutter pub get
-      - flutter build ios --debug --no-codesign
+      - flutter build ios --debug --no-codesign --simulator
+    artifacts:
+      - build/ios/iphonesimulator/*.app
+    publishing:
+      email:
+        recipients:
+          - vohaxo4453@hotmail.com
+
+  ios-device-build:
+    name: iOS Device Build (signed)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+      xcode: latest
+      vars:
+        APP_ID: com.kusetty.convention_hall_manager
+    scripts:
+      - flutter pub get
+      - flutter build ios --debug
     artifacts:
       - build/ios/iphoneos/*.app
     publishing:
