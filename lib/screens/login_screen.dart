@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../providers/app_state.dart';
+import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -52,6 +55,18 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _isSignUp = false);
       } else {
         await supabase.auth.signInWithPassword(email: email, password: password);
+        if (mounted) {
+          // Pre-load dashboard data before navigating
+          try {
+            await context.read<AppState>().loadDashboard();
+          } catch (_) {}
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const HomeScreen()),
+            );
+          }
+        }
       }
     } on AuthException catch (e) {
       setState(() => _error = e.message);
