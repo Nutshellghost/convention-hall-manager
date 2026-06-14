@@ -316,6 +316,16 @@ class DatabaseHelper {
     }
   }
 
+  // === DELETE ALL DATA ===
+
+  Future<void> deleteAllData() async {
+    // Order matters: payments FK references bookings, so delete payments first
+    await _client.from('payments').delete().neq('id', 0);
+    await _client.from('bookings').delete().neq('id', 0);
+    await _client.from('expenses').delete().neq('id', 0);
+    await _client.from('decoration_charges').delete().neq('id', 0);
+  }
+
   // === DASHBOARD STATS ===
 
   Future<int> getUpcomingBookingsCount() async {

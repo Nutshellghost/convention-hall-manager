@@ -104,6 +104,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
             onPressed: _loading ? null : _exportPdf,
             tooltip: 'Export PDF',
           ),
+          IconButton(
+            icon: const Icon(Icons.delete_sweep, color: Colors.red),
+            onPressed: _loading ? null : _confirmDeleteAll,
+            tooltip: 'Delete All Data',
+          ),
         ],
       ),
       body: _loading
@@ -731,6 +736,70 @@ class _ReportsScreenState extends State<ReportsScreen> {
       [XFile(file.path)],
       text: 'Kusetty Convention Hall — $monthLabel Report',
     );
+  }
+
+  Future<void> _confirmDeleteAll() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            SizedBox(width: 12),
+            Text('Delete All Data?'),
+          ],
+        ),
+        content: const Text(
+          'This will permanently delete ALL bookings, payments, expenses, and decoration charges from the cloud database.\n\nThis action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete Everything'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final state = context.read<AppState>();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 18, height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            ),
+            SizedBox(width: 12),
+            Text('Deleting all data...'),
+          ],
+        ),
+        duration: Duration(seconds: 30),
+      ),
+    );
+
+    try {
+      await state.deleteAllData();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All data deleted successfully'), backgroundColor: Colors.green),
+      );
+      _loadMonthDetail();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error deleting data: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   pw.Widget _summaryRow(String label, double amount,

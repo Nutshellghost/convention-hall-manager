@@ -236,4 +236,22 @@ class AppState extends ChangeNotifier {
   Future<double> getTotalPaymentsForPeriod(DateTime start, DateTime end) async {
     return await _db.getTotalPaymentsForPeriod(start, end);
   }
+
+  // Delete all data
+  Future<void> deleteAllData() async {
+    await _db.deleteAllData();
+    _bookings = [];
+    _payments = [];
+    _expenses = [];
+    _decorationCharges = [];
+    _totalRevenue = 0;
+    _totalExpenses = 0;
+    _netProfit = 0;
+    _monthRevenue = 0;
+    _monthExpenses = 0;
+    _monthNetProfit = 0;
+    _monthDecoration = 0;
+    _upcomingCount = 0;
+    notifyListeners();
+  }
 }
