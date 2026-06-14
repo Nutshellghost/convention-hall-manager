@@ -117,86 +117,16 @@ class _SplashScreenState extends State<SplashScreen>
                 );
               },
               child: Container(
-                width: 140,
-                height: 140,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.purple.withOpacity(0.25),
-                      blurRadius: 30,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
+                width: 200,
+                height: 200,
                 child: ClipOval(
                   child: Image.asset(
                     'assets/logo.png',
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) =>
                         Icon(Icons.meeting_room,
-                            size: 60, color: theme.colorScheme.primary),
+                            size: 80, color: theme.colorScheme.primary),
                   ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 32),
-            // App name
-            AnimatedBuilder(
-              animation: _controller,
-              builder: (context, child) {
-                return Opacity(
-                  opacity: _fadeIn.value,
-                  child: child,
-                );
-              },
-              child: Text(
-                'Kusetty',
-                style: TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.primary,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
-            AnimatedBuilder(
-              animation: _controller,
-              builder: (context, child) {
-                return Opacity(
-                  opacity: _fadeIn.value,
-                  child: child,
-                );
-              },
-              child: Text(
-                'Convention Hall',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w500,
-                  color: theme.colorScheme.primary.withOpacity(0.8),
-                  letterSpacing: 2,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Tagline
-            AnimatedBuilder(
-              animation: _controller,
-              builder: (context, child) {
-                return Opacity(
-                  opacity: _subtitleFade.value,
-                  child: child,
-                );
-              },
-              child: Text(
-                'Moments Made Memorable',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontStyle: FontStyle.italic,
-                  color: Colors.grey[500],
-                  letterSpacing: 1,
                 ),
               ),
             ),
