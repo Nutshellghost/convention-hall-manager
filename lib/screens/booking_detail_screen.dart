@@ -282,6 +282,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   Future<void> _addPayment(Booking booking, String type) async {
     final amountController = TextEditingController();
     String paymentMethod = 'cash';
+    DateTime paymentDate = DateTime.now();
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -291,6 +292,27 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Date picker
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.calendar_today),
+                title: Text('Date: ${DateFormat('dd/MM/yyyy').format(paymentDate)}'),
+                subtitle: const Text('Tap to change'),
+                trailing: const Icon(Icons.edit),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: paymentDate,
+                    firstDate: DateTime(2023),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) {
+                    final local = DateTime(picked.year, picked.month, picked.day);
+                    setDialogState(() => paymentDate = local);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
               TextField(
                 controller: amountController,
                 decoration: InputDecoration(
@@ -330,7 +352,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               onPressed: () {
                 final amount = double.tryParse(amountController.text);
                 if (amount == null || amount <= 0) return;
-                Navigator.pop(context, {'amount': amount, 'method': paymentMethod});
+                Navigator.pop(context, {'amount': amount, 'method': paymentMethod, 'date': paymentDate});
               },
               child: const Text('Add Payment'),
             ),
@@ -345,7 +367,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         amount: result['amount'],
         type: type,
         paymentMethod: result['method'],
-        date: DateTime.now(),
+        date: result['date'] as DateTime,
       );
       await context.read<AppState>().addPayment(payment);
       await _loadData();
@@ -355,6 +377,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   Future<void> _editPayment(Payment payment) async {
     final amountController = TextEditingController(text: payment.amount.toString());
     String paymentMethod = payment.paymentMethod;
+    DateTime paymentDate = payment.date;
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -364,6 +387,27 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Date picker
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.calendar_today),
+                title: Text('Date: ${DateFormat('dd/MM/yyyy').format(paymentDate)}'),
+                subtitle: const Text('Tap to change'),
+                trailing: const Icon(Icons.edit),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: paymentDate,
+                    firstDate: DateTime(2023),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) {
+                    final local = DateTime(picked.year, picked.month, picked.day);
+                    setDialogState(() => paymentDate = local);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
               TextField(
                 controller: amountController,
                 decoration: const InputDecoration(
@@ -400,7 +444,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               onPressed: () {
                 final amount = double.tryParse(amountController.text);
                 if (amount == null || amount <= 0) return;
-                Navigator.pop(context, {'amount': amount, 'method': paymentMethod});
+                Navigator.pop(context, {'amount': amount, 'method': paymentMethod, 'date': paymentDate});
               },
               child: const Text('Save'),
             ),
@@ -416,7 +460,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         amount: result['amount'],
         type: payment.type,
         paymentMethod: result['method'],
-        date: payment.date,
+        date: result['date'] as DateTime,
       );
       await context.read<AppState>().updatePayment(updated);
       await _loadData();
