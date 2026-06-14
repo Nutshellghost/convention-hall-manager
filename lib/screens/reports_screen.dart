@@ -542,199 +542,446 @@ class _ReportsScreenState extends State<ReportsScreen> {
   // ===== PDF EXPORT =====
 
   Future<void> _exportPdf() async {
-    final pdf = pw.Document();
-    final monthLabel = DateFormat('MMMM yyyy').format(_selectedMonth);
-    final formatter = NumberFormat('#,##0.00', 'en_IN');
-
-    // Helper to build amount text
-    String fmt(num v) => '₹${formatter.format(v)}';
-
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        build: (pw.Context context) => [
-          // Header
-          pw.Header(
-            level: 0,
-            child: pw.Text(
-              'Kusetty Convention Hall',
-              style: pw.TextStyle(
-                fontSize: 22,
-                fontWeight: pw.FontWeight.bold,
-              ),
-            ),
-          ),
-          pw.SizedBox(height: 4),
-          pw.Text(
-            'Monthly Report — $monthLabel',
-            style: pw.TextStyle(fontSize: 14, color: PdfColors.grey700),
-          ),
-          pw.SizedBox(height: 24),
-
-          // === Income Section ===
-          if (_paymentsWithBookings.isNotEmpty) ...[
-            pw.Header(level: 1, text: 'Income (Payments)'),
-            pw.SizedBox(height: 8),
-            pw.TableHelper.fromTextArray(
-              headers: ['Date', 'Customer', 'Event Type', 'Payment Type', 'Amount'],
-              data: _paymentsWithBookings.map((p) {
-                final bookings = p['bookings'] as Map<String, dynamic>?;
-                final date = p['date'] as String? ?? '-';
-                final customer = bookings?['customer_name'] as String? ?? 'Unknown';
-                final event = bookings?['event_type'] as String? ?? '-';
-                final payType = p['type'] as String? ?? '-';
-                final amount = (p['amount'] as num).toDouble();
-                return [date, customer, event, payType, fmt(amount)];
-              }).toList(),
-              border: pw.TableBorder.all(
-                color: PdfColors.grey300, width: 0.5,
-              ),
-              headerStyle: pw.TextStyle(
-                fontWeight: pw.FontWeight.bold,
-                fontSize: 10,
-                color: PdfColors.white,
-              ),
-              headerDecoration: pw.BoxDecoration(color: PdfColors.blue800),
-              cellStyle: pw.TextStyle(fontSize: 9),
-              cellAlignments: {
-                0: pw.Alignment.centerLeft,
-                1: pw.Alignment.centerLeft,
-                2: pw.Alignment.centerLeft,
-                3: pw.Alignment.center,
-                4: pw.Alignment.centerRight,
-              },
-            ),
-            pw.SizedBox(height: 8),
-            pw.Container(
-              alignment: pw.Alignment.centerRight,
-              child: pw.Text(
-                'Total Income (Payments): ${fmt(_paymentsWithBookings.fold<double>(0, (s, p) => s + (p['amount'] as num).toDouble()))}',
-                style: pw.TextStyle(
-                  fontWeight: pw.FontWeight.bold,
-                  fontSize: 11,
-                  color: PdfColors.green700,
-                ),
-              ),
-            ),
-            pw.SizedBox(height: 16),
+    // Show loading
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+            SizedBox(width: 12),
+            Text('Generating PDF...'),
           ],
-
-          // === Decoration Charges ===
-          if (_decorationCharges.isNotEmpty) ...[
-            pw.Header(level: 1, text: 'Decoration Charges'),
-            pw.SizedBox(height: 8),
-            pw.TableHelper.fromTextArray(
-              headers: ['Date', 'Customer', 'Amount'],
-              data: _decorationCharges.map((d) {
-                final ds = DateFormat('yyyy-MM-dd').format(d.date);
-                return [ds, d.customerName, fmt(d.amount)];
-              }).toList(),
-              border: pw.TableBorder.all(
-                color: PdfColors.grey300, width: 0.5,
-              ),
-              headerStyle: pw.TextStyle(
-                fontWeight: pw.FontWeight.bold,
-                fontSize: 10,
-                color: PdfColors.white,
-              ),
-              headerDecoration: pw.BoxDecoration(color: PdfColors.purple800),
-              cellStyle: pw.TextStyle(fontSize: 9),
-              cellAlignments: {
-                0: pw.Alignment.centerLeft,
-                1: pw.Alignment.centerLeft,
-                2: pw.Alignment.centerRight,
-              },
-            ),
-            pw.SizedBox(height: 8),
-            pw.Container(
-              alignment: pw.Alignment.centerRight,
-              child: pw.Text(
-                'Total Decoration Charges: ${fmt(_decorationCharges.fold<double>(0, (s, d) => s + d.amount))}',
-                style: pw.TextStyle(
-                  fontWeight: pw.FontWeight.bold,
-                  fontSize: 11,
-                  color: PdfColors.purple700,
-                ),
-              ),
-            ),
-            pw.SizedBox(height: 16),
-          ],
-
-          // === Expenses Section ===
-          if (_expenses.isNotEmpty) ...[
-            pw.Header(level: 1, text: 'Expenses'),
-            pw.SizedBox(height: 8),
-            pw.TableHelper.fromTextArray(
-              headers: ['Date', 'Category', 'Description', 'Amount'],
-              data: _expenses.map((e) {
-                final ds = DateFormat('yyyy-MM-dd').format(e.date);
-                return [ds, e.category, e.description, fmt(e.amount)];
-              }).toList(),
-              border: pw.TableBorder.all(
-                color: PdfColors.grey300, width: 0.5,
-              ),
-              headerStyle: pw.TextStyle(
-                fontWeight: pw.FontWeight.bold,
-                fontSize: 10,
-                color: PdfColors.white,
-              ),
-              headerDecoration: pw.BoxDecoration(color: PdfColors.red800),
-              cellStyle: pw.TextStyle(fontSize: 9),
-              cellAlignments: {
-                0: pw.Alignment.centerLeft,
-                1: pw.Alignment.centerLeft,
-                2: pw.Alignment.centerLeft,
-                3: pw.Alignment.centerRight,
-              },
-            ),
-            pw.SizedBox(height: 8),
-            pw.Container(
-              alignment: pw.Alignment.centerRight,
-              child: pw.Text(
-                'Total Expenses: ${fmt(_totalExpenses)}',
-                style: pw.TextStyle(
-                  fontWeight: pw.FontWeight.bold,
-                  fontSize: 11,
-                  color: PdfColors.red700,
-                ),
-              ),
-            ),
-            pw.SizedBox(height: 16),
-          ],
-
-          // === Summary ===
-          pw.Header(level: 1, text: 'Summary'),
-          pw.SizedBox(height: 8),
-          _summaryRow('Total Income (Payments + Decorations)', _totalIncome),
-          _summaryRow('Total Expenses', _totalExpenses, color: PdfColors.red),
-          pw.Divider(),
-          _summaryRow('Net Profit', _netProfit,
-              color: _netProfit >= 0 ? PdfColors.green : PdfColors.red,
-              bold: true),
-          pw.SizedBox(height: 20),
-
-          // === Profit Sharing ===
-          pw.Header(level: 1, text: 'Profit Sharing (50 / 50)'),
-          pw.SizedBox(height: 8),
-          _summaryRow('Raja Gopal (50%)', _netProfit / 2,
-              color: PdfColors.blue700, bold: true),
-          _summaryRow('Guru Prasad (50%)', _netProfit / 2,
-              color: PdfColors.teal700, bold: true),
-        ],
+        ),
+        duration: Duration(seconds: 30),
       ),
     );
 
-    // Save and share
-    final dir = await getTemporaryDirectory();
-    final fileName =
-        'Kusetty_Report_${_selectedMonth.year}_${_selectedMonth.month.toString().padLeft(2, '0')}.pdf';
-    final file = File('${dir.path}/$fileName');
-    await file.writeAsBytes(await pdf.save());
+    try {
+      final pdf = pw.Document();
+      final monthLabel = DateFormat('MMMM yyyy').format(_selectedMonth);
+      final shortMonth = DateFormat('MMM yyyy').format(_selectedMonth);
+      final formatter = NumberFormat('#,##0.00', 'en_IN');
 
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      text: 'Kusetty Convention Hall — $monthLabel Report',
+      String fmt(num v) => '₹${formatter.format(v)}';
+
+      // Compute payment method breakdown
+      final methodTotals = <String, double>{};
+      for (final p in _paymentsWithBookings) {
+        final method = p['payment_method'] as String? ?? 'cash';
+        methodTotals[method] = (methodTotals[method] ?? 0) + (p['amount'] as num).toDouble();
+      }
+
+      // Total decoration charges
+      final decorationTotal = _decorationCharges.fold<double>(0, (s, d) => s + d.amount);
+      final grandIncome = _totalIncome;
+      final netProfit = _netProfit;
+      final half = netProfit / 2;
+      final totalTransactions = _paymentsWithBookings.length + _expenses.length + _decorationCharges.length;
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(28),
+          header: (pw.Context ctx) {
+            if (ctx.pageNumber == 1) return pw.SizedBox();
+            return pw.Container(
+              alignment: pw.Alignment.centerRight,
+              child: pw.Text(
+                'Kusetty Convention Hall — $shortMonth | Page ${ctx.pageNumber}',
+                style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey500),
+              ),
+            );
+          },
+          footer: (pw.Context ctx) => pw.Container(
+            padding: const pw.EdgeInsets.only(top: 4),
+            decoration: const pw.BoxDecoration(
+              border: pw.Border(top: pw.BorderSide(color: PdfColors.grey300, width: 0.5)),
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(
+                  'Kusetty Convention Hall',
+                  style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey500),
+                ),
+                pw.Text(
+                  'Generated ${DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now())}',
+                  style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey500),
+                ),
+              ],
+            ),
+          ),
+          build: (pw.Context ctx) => [
+            // ===== COVER / HEADER =====
+            pw.Container(
+              padding: const pw.EdgeInsets.fromLTRB(0, 16, 0, 20),
+              decoration: pw.BoxDecoration(
+                border: pw.Border(
+                  bottom: pw.BorderSide(color: PdfColors.purple300, width: 2),
+                ),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'Kusetty Convention Hall',
+                    style: pw.TextStyle(
+                      fontSize: 24,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.purple800,
+                    ),
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Text(
+                    'Monthly Report — $monthLabel',
+                    style: pw.TextStyle(fontSize: 14, color: PdfColors.grey700),
+                  ),
+                  pw.SizedBox(height: 6),
+                  pw.Row(
+                    children: [
+                      _metaBadge('Transactions', '$totalTransactions'),
+                      pw.SizedBox(width: 16),
+                      _metaBadge('Report', shortMonth),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 20),
+
+            // ===== EXECUTIVE SUMMARY (always visible) =====
+            pw.Container(
+              padding: const pw.EdgeInsets.all(16),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.grey50,
+                border: pw.Border.all(color: PdfColors.grey300),
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'Executive Summary',
+                    style: pw.TextStyle(
+                      fontSize: 13,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.purple800,
+                    ),
+                  ),
+                  pw.SizedBox(height: 12),
+                  _summaryRow('Total Income (Payments + Decoration)', grandIncome,
+                      color: PdfColors.green700),
+                  _summaryRow('Total Expenses', _totalExpenses, color: PdfColors.red700),
+                  pw.Divider(thickness: 0.5, color: PdfColors.grey400),
+                  _summaryRow('Net Profit', netProfit,
+                      color: netProfit >= 0 ? PdfColors.blue700 : PdfColors.red700,
+                      bold: true),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 24),
+
+            // ===== INCOME SECTION =====
+            if (_paymentsWithBookings.isNotEmpty) ...[
+              _sectionTitle('Income — Payments Received'),
+              pw.SizedBox(height: 8),
+              pw.TableHelper.fromTextArray(
+                headers: ['Date', 'Customer', 'Event', 'Type', 'Method', 'Amount'],
+                data: _paymentsWithBookings.map((p) {
+                  final bookings = p['bookings'] as Map<String, dynamic>?;
+                  final rawDate = p['date'] as String? ?? '';
+                  final date = rawDate.length >= 10 ? rawDate.substring(5) : rawDate;
+                  final customer = bookings?['customer_name'] as String? ?? 'Unknown';
+                  final event = bookings?['event_type'] as String? ?? '-';
+                  final payType = (p['type'] as String? ?? '').toUpperCase();
+                  final method = p['payment_method'] as String? ?? 'cash';
+                  return [date, customer, event, payType, method.toUpperCase(), fmt((p['amount'] as num).toDouble())];
+                }).toList(),
+                border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+                headerStyle: const pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold, fontSize: 8, color: PdfColors.white,
+                ),
+                headerDecoration: const pw.BoxDecoration(color: PdfColors.green800),
+                cellStyle: const pw.TextStyle(fontSize: 8),
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(0.6),
+                  1: const pw.FlexColumnWidth(1.2),
+                  2: const pw.FlexColumnWidth(1.0),
+                  3: const pw.FlexColumnWidth(0.6),
+                  4: const pw.FlexColumnWidth(0.6),
+                  5: const pw.FlexColumnWidth(0.8),
+                },
+                cellAlignments: {
+                  0: pw.Alignment.center,
+                  1: pw.Alignment.centerLeft,
+                  2: pw.Alignment.centerLeft,
+                  3: pw.Alignment.center,
+                  4: pw.Alignment.center,
+                  5: pw.Alignment.centerRight,
+                },
+              ),
+              pw.SizedBox(height: 6),
+              pw.Container(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text(
+                  'Subtotal: ${fmt(_paymentsWithBookings.fold<double>(0, (s, p) => s + (p['amount'] as num).toDouble()))}',
+                  style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.green700),
+                ),
+              ),
+              pw.SizedBox(height: 16),
+            ],
+            if (methodTotals.isNotEmpty) ...[
+              _sectionTitle('Payment Method Breakdown'),
+              pw.SizedBox(height: 8),
+              pw.TableHelper.fromTextArray(
+                headers: ['Method', 'Total', 'Percentage'],
+                data: methodTotals.entries.map((e) {
+                  final pct = grandIncome > 0 ? (e.value / grandIncome * 100) : 0;
+                  return [
+                    e.key[0].toUpperCase() + e.key.substring(1),
+                    fmt(e.value),
+                    '${pct.toStringAsFixed(1)}%',
+                  ];
+                }).toList(),
+                border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+                headerStyle: const pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold, fontSize: 9, color: PdfColors.white,
+                ),
+                headerDecoration: const pw.BoxDecoration(color: PdfColors.teal700),
+                cellStyle: const pw.TextStyle(fontSize: 9),
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(1),
+                  1: const pw.FlexColumnWidth(1),
+                  2: const pw.FlexColumnWidth(1),
+                },
+                cellAlignments: {
+                  0: pw.Alignment.centerLeft,
+                  1: pw.Alignment.centerRight,
+                  2: pw.Alignment.center,
+                },
+              ),
+              pw.SizedBox(height: 16),
+            ],
+
+            // ===== DECORATION CHARGES =====
+            if (_decorationCharges.isNotEmpty) ...[
+              _sectionTitle('Decoration Charges'),
+              pw.SizedBox(height: 8),
+              pw.TableHelper.fromTextArray(
+                headers: ['Date', 'Customer', 'Amount'],
+                data: _decorationCharges.map((d) {
+                  return [DateFormat('dd MMM').format(d.date), d.customerName, fmt(d.amount)];
+                }).toList(),
+                border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+                headerStyle: const pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold, fontSize: 9, color: PdfColors.white,
+                ),
+                headerDecoration: const pw.BoxDecoration(color: PdfColors.purple700),
+                cellStyle: const pw.TextStyle(fontSize: 9),
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(0.6),
+                  1: const pw.FlexColumnWidth(1.6),
+                  2: const pw.FlexColumnWidth(0.8),
+                },
+                cellAlignments: {
+                  0: pw.Alignment.center,
+                  1: pw.Alignment.centerLeft,
+                  2: pw.Alignment.centerRight,
+                },
+              ),
+              pw.SizedBox(height: 6),
+              pw.Container(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text(
+                  'Subtotal: ${fmt(decorationTotal)}',
+                  style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.purple700),
+                ),
+              ),
+              pw.SizedBox(height: 16),
+            ],
+
+            // ===== EXPENSES SECTION =====
+            if (_expenses.isNotEmpty) ...[
+              _sectionTitle('Expenses'),
+              pw.SizedBox(height: 8),
+              pw.TableHelper.fromTextArray(
+                headers: ['Date', 'Category', 'Description', 'Amount'],
+                data: _expenses.map((e) {
+                  return [DateFormat('dd MMM').format(e.date), e.category, e.description, fmt(e.amount)];
+                }).toList(),
+                border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+                headerStyle: const pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold, fontSize: 9, color: PdfColors.white,
+                ),
+                headerDecoration: const pw.BoxDecoration(color: PdfColors.red800),
+                cellStyle: const pw.TextStyle(fontSize: 9),
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(0.6),
+                  1: const pw.FlexColumnWidth(0.8),
+                  2: const pw.FlexColumnWidth(1.4),
+                  3: const pw.FlexColumnWidth(0.8),
+                },
+                cellAlignments: {
+                  0: pw.Alignment.center,
+                  1: pw.Alignment.centerLeft,
+                  2: pw.Alignment.centerLeft,
+                  3: pw.Alignment.centerRight,
+                },
+              ),
+              pw.SizedBox(height: 6),
+              pw.Container(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text(
+                  'Subtotal: ${fmt(_totalExpenses)}',
+                  style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.red700),
+                ),
+              ),
+              pw.SizedBox(height: 16),
+            ],
+
+            // ===== EMPTY STATE NOTE =====
+            if (totalTransactions == 0) ...[
+              pw.Container(
+                padding: const pw.EdgeInsets.all(24),
+                child: pw.Center(
+                  child: pw.Text(
+                    'No transactions recorded for this month.',
+                    style: pw.TextStyle(color: PdfColors.grey500, fontSize: 12),
+                  ),
+                ),
+              ),
+              pw.SizedBox(height: 16),
+            ],
+
+            // ===== PROFIT SHARING ====
+            pw.SizedBox(height: 8),
+            _sectionTitle('Profit Sharing (50 / 50)'),
+            pw.SizedBox(height: 12),
+
+            pw.Container(
+              padding: const pw.EdgeInsets.all(16),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.purple300),
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+              ),
+              child: pw.Column(
+                children: [
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+                    children: [
+                      pw.Column(
+                        children: [
+                          pw.Text('Raja Gopal', style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold, fontSize: 12, color: PdfColors.blue700,
+                          )),
+                          pw.SizedBox(height: 4),
+                          pw.Text(fmt(half), style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold, fontSize: 16, color: PdfColors.blue700,
+                          )),
+                        ],
+                      ),
+                      pw.Container(
+                        width: 1, height: 40, color: PdfColors.purple200,
+                      ),
+                      pw.Column(
+                        children: [
+                          pw.Text('Guru Prasad', style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold, fontSize: 12, color: PdfColors.teal700,
+                          )),
+                          pw.SizedBox(height: 4),
+                          pw.Text(fmt(half), style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold, fontSize: 16, color: PdfColors.teal700,
+                          )),
+                        ],
+                      ),
+                    ],
+                  ),
+                  pw.SizedBox(height: 12),
+                  pw.Divider(thickness: 0.5, color: PdfColors.grey300),
+                  pw.SizedBox(height: 12),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+                    children: [
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('Signature: ___________________', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey500)),
+                        ],
+                      ),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('Signature: ___________________', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey500)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+
+      // Save to app documents (persistent storage)
+      final dir = await getApplicationDocumentsDirectory();
+      final fileName =
+          'Kusetty_Report_${_selectedMonth.year}_${_selectedMonth.month.toString().padLeft(2, '0')}.pdf';
+      final file = File('${dir.path}/$fileName');
+      await file.writeAsBytes(await pdf.save());
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      // Share
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'Kusetty Convention Hall — $monthLabel Report',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('PDF Error: $e'), backgroundColor: Colors.red, duration: const Duration(seconds: 5)),
+      );
+    }
+  }
+
+  pw.Widget _metaBadge(String label, String value) {
+    return pw.Row(
+      mainAxisSize: pw.MainAxisSize.min,
+      children: [
+        pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: pw.BoxDecoration(
+            color: PdfColors.grey100,
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+          ),
+          child: pw.Text(
+            '$label: $value',
+            style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+          ),
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _sectionTitle(String title) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.grey100,
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+      ),
+      child: pw.Text(
+        title,
+        style: const pw.TextStyle(
+          fontSize: 11,
+          fontWeight: pw.FontWeight.bold,
+          color: PdfColors.grey800,
+        ),
+      ),
     );
   }
 
