@@ -272,43 +272,55 @@ class _AddBookingScreenState extends State<AddBookingScreen> {
 
     setState(() => _loading = true);
 
-    final booking = Booking(
-      id: widget.booking?.id,
-      customerName: _nameController.text.trim(),
-      phone: _phoneController.text.trim(),
-      eventDate: _eventDate,
-      bookingDate: _bookingDate,
-      eventType: _eventTypeController.text.trim(),
-      hallName: _hallName,
-      startTime: _startTime,
-      endTime: _endTime,
-      totalAmount: double.parse(_totalAmountController.text.trim()),
-      advanceAmount: double.tryParse(_advanceAmountController.text.trim()) ?? 0,
-      status: widget.booking?.status ?? 'confirmed',
-      notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
-      createdAt: widget.booking?.createdAt,
-    );
+    try {
+      final booking = Booking(
+        id: widget.booking?.id,
+        customerName: _nameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        eventDate: _eventDate,
+        bookingDate: _bookingDate,
+        eventType: _eventTypeController.text.trim(),
+        hallName: _hallName,
+        startTime: _startTime,
+        endTime: _endTime,
+        totalAmount: double.parse(_totalAmountController.text.trim()),
+        advanceAmount: double.tryParse(_advanceAmountController.text.trim()) ?? 0,
+        status: widget.booking?.status ?? 'confirmed',
+        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        createdAt: widget.booking?.createdAt,
+      );
 
-    final state = context.read<AppState>();
-    if (widget.booking != null) {
-      await state.updateBooking(booking);
-    } else {
-      final id = await state.addBooking(booking);
-      // If advance amount > 0, also record it as an advance payment
-      if (booking.advanceAmount > 0) {
-        await state.addPayment(Payment(
-          bookingId: id,
-          amount: booking.advanceAmount,
-          type: 'advance',
-          date: _bookingDate,
-        ));
+      final state = context.read<AppState>();
+      if (widget.booking != null) {
+        await state.updateBooking(booking);
+      } else {
+        final id = await state.addBooking(booking);
+        // If advance amount > 0, also record it as an advance payment
+        if (booking.advanceAmount > 0) {
+          await state.addPayment(Payment(
+            bookingId: id,
+            amount: booking.advanceAmount,
+            type: 'advance',
+            date: _bookingDate,
+          ));
+        }
       }
-    }
 
-    if (context.mounted) {
+      if (!mounted) return;
+      setState(() => _loading = false);
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(widget.booking != null ? 'Booking updated' : 'Booking created')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
       );
     }
   }
