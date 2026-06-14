@@ -3,6 +3,7 @@ class Booking {
   final String customerName;
   final String phone;
   final DateTime eventDate;
+  final DateTime bookingDate;
   final String eventType;
   final String hallName;
   final String startTime;
@@ -18,6 +19,7 @@ class Booking {
     required this.customerName,
     required this.phone,
     required this.eventDate,
+    DateTime? bookingDate,
     required this.eventType,
     required this.hallName,
     required this.startTime,
@@ -27,7 +29,8 @@ class Booking {
     this.status = 'confirmed',
     this.notes,
     DateTime? createdAt,
-  }) : createdAt = createdAt ?? DateTime.now();
+  })  : bookingDate = bookingDate ?? (createdAt ?? DateTime.now()),
+        createdAt = createdAt ?? DateTime.now();
 
   Map<String, dynamic> toMap() {
     return {
@@ -35,6 +38,7 @@ class Booking {
       'customer_name': customerName,
       'phone': phone,
       'event_date': eventDate.toIso8601String().split('T')[0],
+      'booking_date': bookingDate.toIso8601String().split('T')[0],
       'event_type': eventType,
       'hall_name': hallName,
       'start_time': startTime,
@@ -53,6 +57,9 @@ class Booking {
       customerName: map['customer_name'] as String,
       phone: map['phone'] as String,
       eventDate: DateTime.parse(map['event_date'] as String),
+      bookingDate: map['booking_date'] != null
+          ? DateTime.parse(map['booking_date'] as String)
+          : null,
       eventType: map['event_type'] as String,
       hallName: map['hall_name'] as String,
       startTime: map['start_time'] as String,
@@ -70,6 +77,7 @@ class Booking {
     String? customerName,
     String? phone,
     DateTime? eventDate,
+    DateTime? bookingDate,
     String? eventType,
     String? hallName,
     String? startTime,
@@ -85,6 +93,7 @@ class Booking {
       customerName: customerName ?? this.customerName,
       phone: phone ?? this.phone,
       eventDate: eventDate ?? this.eventDate,
+      bookingDate: bookingDate ?? this.bookingDate,
       eventType: eventType ?? this.eventType,
       hallName: hallName ?? this.hallName,
       startTime: startTime ?? this.startTime,

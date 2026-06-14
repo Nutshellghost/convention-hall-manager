@@ -61,12 +61,14 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
-            onPressed: () => Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => AddBookingScreen(booking: booking),
-              ),
-            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AddBookingScreen(booking: booking),
+                ),
+              ).then((_) => _loadData());
+            },
           ),
           IconButton(
             icon: const Icon(Icons.delete, color: Colors.red),
@@ -250,6 +252,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
+        onTap: () => _editPayment(payment),
         leading: CircleAvatar(
           backgroundColor: payment.type == 'advance'
               ? Colors.blue.withOpacity(0.2)
@@ -345,6 +348,77 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         date: DateTime.now(),
       );
       await context.read<AppState>().addPayment(payment);
+      await _loadData();
+    }
+  }
+
+  Future<void> _editPayment(Payment payment) async {
+    final amountController = TextEditingController(text: payment.amount.toString());
+    String paymentMethod = payment.paymentMethod;
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Edit Payment'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: amountController,
+                decoration: const InputDecoration(
+                  labelText: 'Amount (₹)',
+                  prefixIcon: Icon(Icons.currency_rupee),
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: paymentMethod,
+                decoration: const InputDecoration(
+                  labelText: 'Payment Method',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.payment),
+                ),
+                items: ['cash', 'upi', 'card', 'bank']
+                    .map((m) => DropdownMenuItem(
+                      value: m,
+                      child: Text(m[0].toUpperCase() + m.substring(1)),
+                    ))
+                    .toList(),
+                onChanged: (v) => setDialogState(() => paymentMethod = v!),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final amount = double.tryParse(amountController.text);
+                if (amount == null || amount <= 0) return;
+                Navigator.pop(context, {'amount': amount, 'method': paymentMethod});
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != null) {
+      final updated = Payment(
+        id: payment.id,
+        bookingId: payment.bookingId,
+        amount: result['amount'],
+        type: payment.type,
+        paymentMethod: result['method'],
+        date: payment.date,
+      );
+      await context.read<AppState>().updatePayment(updated);
       await _loadData();
     }
   }

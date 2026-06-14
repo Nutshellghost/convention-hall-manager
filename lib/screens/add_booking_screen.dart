@@ -21,22 +21,16 @@ class _AddBookingScreenState extends State<AddBookingScreen> {
   final _advanceAmountController = TextEditingController();
   final _notesController = TextEditingController();
 
+  DateTime _bookingDate = DateTime.now();
   DateTime _eventDate = DateTime.now();
-  String _eventType = 'Wedding';
+  final _eventTypeController = TextEditingController();
   String _hallName = 'Main Hall';
   String _startTime = '09:00';
   String _endTime = '12:00';
   bool _loading = false;
 
-  final List<String> _eventTypes = [
-    'Wedding', 'Reception', 'Engagement', 'Birthday',
-    'Anniversary', 'Corporate Event', 'Conference',
-    'Seminar', 'Family Gathering', 'Religious Ceremony',
-    'Other',
-  ];
-
   final List<String> _hallNames = [
-    'Main Hall', 'Mini Hall', 'Garden Area', 'Banquet Hall', 'Conference Room',
+    'Main Hall', 'Rooftop Gardenia',
   ];
 
   final List<String> _timeSlots = [
@@ -55,8 +49,9 @@ class _AddBookingScreenState extends State<AddBookingScreen> {
       _totalAmountController.text = b.totalAmount.toString();
       _advanceAmountController.text = b.advanceAmount.toString();
       _notesController.text = b.notes ?? '';
+      _bookingDate = b.bookingDate ?? DateTime.now();
       _eventDate = b.eventDate;
-      _eventType = b.eventType;
+      _eventTypeController.text = b.eventType;
       _hallName = b.hallName;
       _startTime = b.startTime;
       _endTime = b.endTime;
@@ -70,6 +65,7 @@ class _AddBookingScreenState extends State<AddBookingScreen> {
     _totalAmountController.dispose();
     _advanceAmountController.dispose();
     _notesController.dispose();
+    _eventTypeController.dispose();
     super.dispose();
   }
 
@@ -117,15 +113,14 @@ class _AddBookingScreenState extends State<AddBookingScreen> {
               // Event Section
               Text('Event Details', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _eventType,
+              TextFormField(
+                controller: _eventTypeController,
                 decoration: const InputDecoration(
                   labelText: 'Event Type',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.event),
                 ),
-                items: _eventTypes.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                onChanged: (v) => setState(() => _eventType = v!),
+                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
@@ -140,10 +135,32 @@ class _AddBookingScreenState extends State<AddBookingScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Date picker
+              // Booking Date picker
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.calendar_today),
+                title: Text('Booking Date: ${_bookingDate.day}/${_bookingDate.month}/${_bookingDate.year}'),
+                subtitle: Text('Tap to change'),
+                trailing: const Icon(Icons.edit),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _bookingDate,
+                    firstDate: DateTime(2023),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) {
+                    final local = DateTime(picked.year, picked.month, picked.day);
+                    setState(() => _bookingDate = local);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Event Date picker
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.event),
                 title: Text('Date: ${_eventDate.day}/${_eventDate.month}/${_eventDate.year}'),
                 subtitle: Text('Tap to change'),
                 trailing: const Icon(Icons.edit),
@@ -154,7 +171,10 @@ class _AddBookingScreenState extends State<AddBookingScreen> {
                     firstDate: DateTime.now().subtract(const Duration(days: 30)),
                     lastDate: DateTime(2030),
                   );
-                  if (picked != null) setState(() => _eventDate = picked);
+                  if (picked != null) {
+                    final local = DateTime(picked.year, picked.month, picked.day);
+                    setState(() => _eventDate = local);
+                  }
                 },
               ),
               const SizedBox(height: 12),
@@ -257,7 +277,8 @@ class _AddBookingScreenState extends State<AddBookingScreen> {
       customerName: _nameController.text.trim(),
       phone: _phoneController.text.trim(),
       eventDate: _eventDate,
-      eventType: _eventType,
+      bookingDate: _bookingDate,
+      eventType: _eventTypeController.text.trim(),
       hallName: _hallName,
       startTime: _startTime,
       endTime: _endTime,
@@ -279,7 +300,7 @@ class _AddBookingScreenState extends State<AddBookingScreen> {
           bookingId: id,
           amount: booking.advanceAmount,
           type: 'advance',
-          date: DateTime.now(),
+          date: _bookingDate,
         ));
       }
     }

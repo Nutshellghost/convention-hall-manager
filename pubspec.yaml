@@ -1,7 +1,7 @@
 name: convention_hall_manager
 description: "Kusetty Convention Hall Manager - Android app for managing bookings, payments, expenses, and reports."
 publish_to: 'none'
-version: 1.0.0+1
+version: 2.0.0+1
 
 environment:
   sdk: ^3.5.0
@@ -14,7 +14,9 @@ dependencies:
   table_calendar: any
   intl: any
   provider: any
-  fl_chart: ^0.69.0
+  pdf: ^3.11.0
+  path_provider: ^2.1.0
+  share_plus: ^10.0.0
 
 dev_dependencies:
   flutter_test:

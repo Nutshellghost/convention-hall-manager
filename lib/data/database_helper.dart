@@ -1,8 +1,9 @@
-import 'package:postgrest/postgrest.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/booking.dart';
 import '../models/payment.dart';
 import '../models/expense.dart';
+import '../models/decoration_charge.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -132,6 +133,15 @@ class DatabaseHelper {
     return id;
   }
 
+  Future<int> updatePayment(Payment payment) async {
+    if (payment.id == null) throw Exception('Payment ID required for update');
+    await _client
+        .from('payments')
+        .update(payment.toMap())
+        .eq('id', payment.id!);
+    return payment.id!;
+  }
+
   // === EXPENSES ===
 
   Future<int> insertExpense(Expense expense) async {
@@ -202,6 +212,19 @@ class DatabaseHelper {
     return ((result ?? 0) as num).toDouble();
   }
 
+  Future<List<Map<String, dynamic>>> getPaymentsWithBookingDetails(int year, int month) async {
+    final monthStr = month.toString().padLeft(2, '0');
+    final data = await _client
+        .from('payments')
+        .select('''
+          id, amount, type, payment_method, date, notes,
+          bookings!left(customer_name, event_type, hall_name, event_date, created_at)
+        ''')
+        .like('date', '$year-$monthStr%')
+        .order('date', ascending: true);
+    return (data as List).cast<Map<String, dynamic>>();
+  }
+
   Future<Map<String, double>> getExpenseSummaryByCategory() async {
     final data = await _client
         .from('expenses')
@@ -219,6 +242,78 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getMonthlyProfitReport() async {
     final result = await _client.rpc('get_monthly_profit_report');
     return (result as List?)?.cast<Map<String, dynamic>>() ?? [];
+  }
+
+  // === DECORATION CHARGES ===
+
+  Future<int> insertDecorationCharge(DecorationCharge charge) async {
+    final map = charge.toMap();
+    map.remove('id');
+    try {
+      final result = await _client
+          .from('decoration_charges')
+          .insert(map)
+          .select('id')
+          .single();
+      return result['id'] as int;
+    } catch (e) {
+      debugPrint('Error inserting decoration charge: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<DecorationCharge>> getDecorationChargesForMonth(int year, int month) async {
+    try {
+      final monthStr = month.toString().padLeft(2, '0');
+      final data = await _client
+          .from('decoration_charges')
+          .select()
+          .like('date', '$year-$monthStr%')
+          .order('date', ascending: true);
+      return (data as List).map((r) => DecorationCharge.fromMap(r)).toList();
+    } catch (e) {
+      debugPrint('Error loading decoration charges: $e');
+      return [];
+    }
+  }
+
+  Future<List<DecorationCharge>> getAllDecorationCharges() async {
+    try {
+      final data = await _client
+          .from('decoration_charges')
+          .select()
+          .order('date', ascending: false);
+      return (data as List).map((r) => DecorationCharge.fromMap(r)).toList();
+    } catch (e) {
+      debugPrint('Error loading all decoration charges: $e');
+      return [];
+    }
+  }
+
+  Future<double> getTotalDecorationCharges() async {
+    try {
+      final data = await _client
+          .from('decoration_charges')
+          .select('amount');
+      double total = 0;
+      for (var row in (data as List)) {
+        total += (row['amount'] as num).toDouble();
+      }
+      return total;
+    } catch (e) {
+      debugPrint('Error getting total decoration charges: $e');
+      return 0;
+    }
+  }
+
+  Future<int> deleteDecorationCharge(int id) async {
+    try {
+      await _client.from('decoration_charges').delete().eq('id', id);
+      return id;
+    } catch (e) {
+      debugPrint('Error deleting decoration charge: $e');
+      rethrow;
+    }
   }
 
   // === DASHBOARD STATS ===

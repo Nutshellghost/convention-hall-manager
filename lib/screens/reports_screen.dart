@@ -1,8 +1,16 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:fl_chart/fl_chart.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../providers/app_state.dart';
+import '../data/database_helper.dart';
+import '../models/payment.dart';
+import '../models/expense.dart';
+import '../models/decoration_charge.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -12,165 +20,168 @@ class ReportsScreen extends StatefulWidget {
 }
 
 class _ReportsScreenState extends State<ReportsScreen> {
-  List<Map<String, dynamic>> _monthlyReport = [];
-  Map<String, double> _categorySummary = {};
+  final _currencyFormat = NumberFormat('#,##0.00', 'en_IN');
+
+  DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month, 1);
+
+  List<Map<String, dynamic>> _paymentsWithBookings = [];
+  List<Expense> _expenses = [];
+  List<DecorationCharge> _decorationCharges = [];
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadReports();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadMonthDetail());
   }
 
-  Future<void> _loadReports() async {
+  Future<void> _loadMonthDetail() async {
     setState(() => _loading = true);
-    final state = context.read<AppState>();
-    _monthlyReport = await state.getMonthlyProfitReport();
-    _categorySummary = await state.getExpenseSummaryByCategory();
-    setState(() => _loading = false);
+    final db = DatabaseHelper.instance;
+    try {
+      final results = await Future.wait([
+        db.getPaymentsWithBookingDetails(_selectedMonth.year, _selectedMonth.month),
+        db.getExpensesForMonth(_selectedMonth.year, _selectedMonth.month),
+        db.getDecorationChargesForMonth(_selectedMonth.year, _selectedMonth.month),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _paymentsWithBookings = results[0] as List<Map<String, dynamic>>;
+        _expenses = results[1] as List<Expense>;
+        _decorationCharges = results[2] as List<DecorationCharge>;
+        _loading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading month detail: $e');
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
   }
+
+  void _goToPreviousMonth() {
+    setState(() {
+      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1, 1);
+    });
+    _loadMonthDetail();
+  }
+
+  void _goToNextMonth() {
+    setState(() {
+      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
+    });
+    _loadMonthDetail();
+  }
+
+  double get _totalIncome {
+    double t = 0;
+    for (final p in _paymentsWithBookings) {
+      t += (p['amount'] as num).toDouble();
+    }
+    for (final d in _decorationCharges) {
+      t += d.amount;
+    }
+    return t;
+  }
+
+  double get _totalExpenses {
+    double t = 0;
+    for (final e in _expenses) {
+      t += e.amount;
+    }
+    return t;
+  }
+
+  double get _netProfit => _totalIncome - _totalExpenses;
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Reports')),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Reports'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadReports,
+            icon: const Icon(Icons.picture_as_pdf),
+            onPressed: _loading ? null : _exportPdf,
+            tooltip: 'Export PDF',
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadReports,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // Net Profit Summary Card
-            _buildSummaryCard(context),
-            const SizedBox(height: 16),
-
-            // Profit Trend Chart
-            if (_monthlyReport.isNotEmpty) ...[
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Monthly Profit Trend', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        height: 200,
-                        child: _buildProfitChart(),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _buildLegend(Colors.green, 'Revenue'),
-                          const SizedBox(width: 24),
-                          _buildLegend(Colors.red, 'Expenses'),
-                          const SizedBox(width: 24),
-                          _buildLegend(Colors.blue, 'Net Profit'),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _loadMonthDetail,
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  _buildMonthPicker(),
+                  const SizedBox(height: 16),
+                  _buildSummaryCard(),
+                  const SizedBox(height: 16),
+                  _buildIncomeSection(),
+                  const SizedBox(height: 16),
+                  _buildDecorationSection(),
+                  const SizedBox(height: 16),
+                  _buildExpensesSection(),
+                  const SizedBox(height: 16),
+                  _buildProfitSharingCard(),
+                ],
               ),
-              const SizedBox(height: 16),
-            ],
-
-            // Expense breakdown by category
-            if (_categorySummary.isNotEmpty) ...[
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Expenses by Category', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        height: 200,
-                        child: _buildPieChart(),
-                      ),
-                      const SizedBox(height: 12),
-                      ..._categorySummary.entries.map((e) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 3),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 12, height: 12,
-                              decoration: BoxDecoration(
-                                color: _getCategoryColor(e.key),
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(child: Text(e.key, style: const TextStyle(fontSize: 13))),
-                            Text(
-                              '₹${NumberFormat('#,##0', 'en_IN').format(e.value)}',
-                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                            ),
-                          ],
-                        ),
-                      )),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // Monthly report table
-            if (_monthlyReport.isNotEmpty) ...[
-              Text('Monthly Breakdown', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              ..._monthlyReport.map((r) => _buildMonthlyRow(r)),
-            ],
-          ],
-        ),
-      ),
+            ),
     );
   }
 
-  Widget _buildSummaryCard(BuildContext context) {
-    double totalRevenue = 0, totalExpenses = 0;
-    for (var r in _monthlyReport) {
-      totalRevenue += (r['total_payments'] as num).toDouble();
-      totalExpenses += (r['total_expenses'] as num).toDouble();
-    }
-    final netProfit = totalRevenue - totalExpenses;
+  Widget _buildMonthPicker() {
+    final monthName = DateFormat('MMMM yyyy').format(_selectedMonth);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.chevron_left),
+          onPressed: _goToPreviousMonth,
+        ),
+        const SizedBox(width: 16),
+        Text(
+          monthName,
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(width: 16),
+        IconButton(
+          icon: const Icon(Icons.chevron_right),
+          onPressed: _goToNextMonth,
+        ),
+      ],
+    );
+  }
 
+  Widget _buildSummaryCard() {
     return Card(
+      elevation: 3,
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child: Column(
+        child: Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatItem('Total Revenue', '₹${NumberFormat('#,##0', 'en_IN').format(totalRevenue)}', Colors.green),
-                ),
-                Container(width: 1, height: 40, color: Colors.grey[200]),
-                Expanded(
-                  child: _buildStatItem('Total Expenses', '₹${NumberFormat('#,##0', 'en_IN').format(totalExpenses)}', Colors.red),
-                ),
-                Container(width: 1, height: 40, color: Colors.grey[200]),
-                Expanded(
-                  child: _buildStatItem('Net Profit', '₹${NumberFormat('#,##0', 'en_IN').format(netProfit)}', netProfit >= 0 ? Colors.blue : Colors.red),
-                ),
-              ],
+            Expanded(
+              child: _buildStatItem(
+                'Total Income',
+                '₹${_currencyFormat.format(_totalIncome)}',
+                Colors.green,
+              ),
+            ),
+            Container(width: 1, height: 40, color: Colors.grey[300]),
+            Expanded(
+              child: _buildStatItem(
+                'Total Expenses',
+                '₹${_currencyFormat.format(_totalExpenses)}',
+                Colors.red,
+              ),
+            ),
+            Container(width: 1, height: 40, color: Colors.grey[300]),
+            Expanded(
+              child: _buildStatItem(
+                'Net Profit',
+                '₹${_currencyFormat.format(_netProfit)}',
+                _netProfit >= 0 ? Colors.blue : Colors.red,
+              ),
             ),
           ],
         ),
@@ -183,179 +194,339 @@ class _ReportsScreenState extends State<ReportsScreen> {
       children: [
         Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 11)),
         const SizedBox(height: 4),
-        Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: color)),
+        Text(
+          value,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: color,
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildProfitChart() {
-    if (_monthlyReport.isEmpty) return const SizedBox();
-
-    final reversed = _monthlyReport.reversed.toList();
-    final maxVal = reversed.fold<double>(0, (max, r) {
-      final pm = (r['total_payments'] as num).toDouble();
-      final ex = (r['total_expenses'] as num).toDouble();
-      return [max, pm, ex].reduce((a, b) => a > b ? a : b);
-    });
-
-    return BarChart(
-      BarChartData(
-        alignment: BarChartAlignment.spaceAround,
-        maxY: maxVal * 1.2,
-        barTouchData: BarTouchData(enabled: true),
-        titlesData: FlTitlesData(
-          show: true,
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (value, meta) {
-                final idx = value.toInt();
-                if (idx < 0 || idx >= reversed.length) return const SizedBox();
-                final month = reversed[idx]['month'] as String;
-                final parts = month.split('-');
-                final months = ['', 'J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
-                return Text(months[int.parse(parts[1])], style: const TextStyle(fontSize: 10));
-              },
-              reservedSize: 20,
-            ),
-          ),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 40,
-              getTitlesWidget: (value, meta) {
-                return Text('₹${(value / 1000).toInt()}k', style: const TextStyle(fontSize: 9));
-              },
-            ),
-          ),
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        ),
-        gridData: FlGridData(
-          show: true,
-          horizontalInterval: maxVal / 4,
-          getDrawingHorizontalLine: (value) => FlLine(
-            color: Colors.grey.withOpacity(0.15),
-            strokeWidth: 1,
+  Widget _buildIncomeSection() {
+    if (_paymentsWithBookings.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            'No income entries for this month',
+            style: TextStyle(color: Colors.grey[600]),
           ),
         ),
-        borderData: FlBorderData(show: false),
-        barGroups: List.generate(reversed.length, (i) {
-          final r = reversed[i];
-          final payments = (r['total_payments'] as num).toDouble();
-          final expenses = (r['total_expenses'] as num).toDouble();
-          final profit = payments - expenses;
-          return BarChartGroupData(
-            x: i,
-            barRods: [
-              BarChartRodData(
-                toY: payments,
-                color: Colors.green.withOpacity(0.7),
-                width: 8,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-              ),
-              BarChartRodData(
-                toY: expenses,
-                color: Colors.red.withOpacity(0.7),
-                width: 8,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-              ),
-              BarChartRodData(
-                toY: profit < 0 ? 0 : profit,
-                color: Colors.blue.withOpacity(0.7),
-                width: 8,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-              ),
-            ],
-          );
-        }),
-      ),
-    );
-  }
-
-  Widget _buildPieChart() {
-    final total = _categorySummary.values.fold<double>(0, (a, b) => a + b);
-    final colors = [
-      Colors.amber, Colors.blue, Colors.brown, Colors.teal,
-      Colors.cyan, Colors.pink, Colors.orange, Colors.indigo,
-      Colors.deepOrange, Colors.lime, Colors.purple, Colors.grey,
-    ];
-
-    return PieChart(
-      PieChartData(
-        sectionsSpace: 2,
-        centerSpaceRadius: 30,
-        sections: _categorySummary.entries.toList().asMap().entries.map((entry) {
-          final i = entry.key;
-          final e = entry.value;
-          final percentage = (e.value / total * 100);
-          return PieChartSectionData(
-            color: colors[i % colors.length],
-            value: e.value,
-            title: '${percentage.toStringAsFixed(0)}%',
-            radius: 50,
-            titleStyle: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildMonthlyRow(Map<String, dynamic> report) {
-    final month = report['month'] as String;
-    final parts = month.split('-');
-    final months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    final monthName = months[int.parse(parts[1])];
-    final year = parts[0];
-    final payments = (report['total_payments'] as num).toDouble();
-    final expenses = (report['total_expenses'] as num).toDouble();
-    final profit = (report['net_profit'] as num).toDouble();
+      );
+    }
 
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 3),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(
-              width: 60,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(monthName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  Text(year, style: TextStyle(color: Colors.grey[500], fontSize: 10)),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('+₹${NumberFormat('#,##0', 'en_IN').format(payments)}', style: const TextStyle(color: Colors.green, fontSize: 12)),
-                  Text('-₹${NumberFormat('#,##0', 'en_IN').format(expenses)}', style: const TextStyle(color: Colors.red, fontSize: 12)),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: profit >= 0
-                    ? Colors.green.withOpacity(0.1)
-                    : Colors.red.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '₹${NumberFormat('#,##0', 'en_IN').format(profit)}',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: profit >= 0 ? Colors.green[700] : Colors.red[700],
+            Row(
+              children: [
+                const Icon(Icons.account_balance, color: Colors.green, size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  'Income',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
-              ),
+                const Spacer(),
+                Text(
+                  '₹${_currencyFormat.format(_paymentsWithBookings.fold<double>(0, (s, p) => s + (p['amount'] as num).toDouble()))}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(),
+            ..._paymentsWithBookings.map((p) {
+              final bookings = p['bookings'] as Map<String, dynamic>?;
+              final customerName = bookings?['customer_name'] as String? ?? 'Unknown';
+              final eventType = bookings?['event_type'] as String? ?? '-';
+              final amount = (p['amount'] as num).toDouble();
+              final paymentType = p['type'] as String? ?? '-';
+              final dateStr = p['date'] as String? ?? '';
+              final date = dateStr.isNotEmpty
+                  ? DateFormat('dd MMM').format(DateTime.parse(dateStr))
+                  : '-';
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            customerName,
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                          Text(
+                            '$eventType • $paymentType',
+                            style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(date, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 100,
+                      child: Text(
+                        '₹${_currencyFormat.format(amount)}',
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDecorationSection() {
+    if (_decorationCharges.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            'No decoration charges for this month',
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.brush, color: Colors.purple, size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  'Decoration Charges',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                Text(
+                  '₹${_currencyFormat.format(_decorationCharges.fold<double>(0, (s, d) => s + d.amount))}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.purple,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(),
+            ..._decorationCharges.map((d) {
+              final dateStr = DateFormat('dd MMM').format(d.date);
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        d.customerName,
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                    ),
+                    Text(dateStr, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 100,
+                      child: Text(
+                        '₹${_currencyFormat.format(d.amount)}',
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.purple,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpensesSection() {
+    if (_expenses.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            'No expenses for this month',
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.shopping_cart, color: Colors.red, size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  'Expenses',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                Text(
+                  '₹${_currencyFormat.format(_totalExpenses)}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(),
+            ..._expenses.map((e) {
+              final dateStr = DateFormat('dd MMM').format(e.date);
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            e.category,
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                          Text(
+                            e.description,
+                            style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(dateStr, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 100,
+                      child: Text(
+                        '₹${_currencyFormat.format(e.amount)}',
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.red,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfitSharingCard() {
+    final half = _netProfit / 2;
+    return Card(
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.blue.shade50, Colors.teal.shade50],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            const Text(
+              'Profit Sharing (50/50)',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    children: [
+                      Icon(Icons.person, color: Colors.blue.shade700, size: 28),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Raja Gopal',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '₹${_currencyFormat.format(half)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 60,
+                  color: Colors.grey[300],
+                ),
+                Expanded(
+                  child: Column(
+                    children: [
+                      Icon(Icons.person, color: Colors.teal.shade700, size: 28),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Guru Prasad',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '₹${_currencyFormat.format(half)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: Colors.teal.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -363,31 +534,230 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  Widget _buildLegend(Color color, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(width: 12, height: 12, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
-        const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 11)),
-      ],
+  // ===== PDF EXPORT =====
+
+  Future<void> _exportPdf() async {
+    final pdf = pw.Document();
+    final monthLabel = DateFormat('MMMM yyyy').format(_selectedMonth);
+    final formatter = NumberFormat('#,##0.00', 'en_IN');
+
+    // Helper to build amount text
+    String fmt(num v) => '₹${formatter.format(v)}';
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (pw.Context context) => [
+          // Header
+          pw.Header(
+            level: 0,
+            child: pw.Text(
+              'Kusetty Convention Hall',
+              style: pw.TextStyle(
+                fontSize: 22,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            'Monthly Report — $monthLabel',
+            style: pw.TextStyle(fontSize: 14, color: PdfColors.grey700),
+          ),
+          pw.SizedBox(height: 24),
+
+          // === Income Section ===
+          if (_paymentsWithBookings.isNotEmpty) ...[
+            pw.Header(level: 1, text: 'Income (Payments)'),
+            pw.SizedBox(height: 8),
+            pw.TableHelper.fromTextArray(
+              headers: ['Date', 'Customer', 'Event Type', 'Payment Type', 'Amount'],
+              data: _paymentsWithBookings.map((p) {
+                final bookings = p['bookings'] as Map<String, dynamic>?;
+                final date = p['date'] as String? ?? '-';
+                final customer = bookings?['customer_name'] as String? ?? 'Unknown';
+                final event = bookings?['event_type'] as String? ?? '-';
+                final payType = p['type'] as String? ?? '-';
+                final amount = (p['amount'] as num).toDouble();
+                return [date, customer, event, payType, fmt(amount)];
+              }).toList(),
+              border: pw.TableBorder.all(
+                color: PdfColors.grey300, width: 0.5,
+              ),
+              headerStyle: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 10,
+                color: PdfColors.white,
+              ),
+              headerDecoration: pw.BoxDecoration(color: PdfColors.blue800),
+              cellStyle: pw.TextStyle(fontSize: 9),
+              cellAlignments: {
+                0: pw.Alignment.centerLeft,
+                1: pw.Alignment.centerLeft,
+                2: pw.Alignment.centerLeft,
+                3: pw.Alignment.center,
+                4: pw.Alignment.centerRight,
+              },
+            ),
+            pw.SizedBox(height: 8),
+            pw.Container(
+              alignment: pw.Alignment.centerRight,
+              child: pw.Text(
+                'Total Income (Payments): ${fmt(_paymentsWithBookings.fold<double>(0, (s, p) => s + (p['amount'] as num).toDouble()))}',
+                style: pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: 11,
+                  color: PdfColors.green700,
+                ),
+              ),
+            ),
+            pw.SizedBox(height: 16),
+          ],
+
+          // === Decoration Charges ===
+          if (_decorationCharges.isNotEmpty) ...[
+            pw.Header(level: 1, text: 'Decoration Charges'),
+            pw.SizedBox(height: 8),
+            pw.TableHelper.fromTextArray(
+              headers: ['Date', 'Customer', 'Amount'],
+              data: _decorationCharges.map((d) {
+                final ds = DateFormat('yyyy-MM-dd').format(d.date);
+                return [ds, d.customerName, fmt(d.amount)];
+              }).toList(),
+              border: pw.TableBorder.all(
+                color: PdfColors.grey300, width: 0.5,
+              ),
+              headerStyle: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 10,
+                color: PdfColors.white,
+              ),
+              headerDecoration: pw.BoxDecoration(color: PdfColors.purple800),
+              cellStyle: pw.TextStyle(fontSize: 9),
+              cellAlignments: {
+                0: pw.Alignment.centerLeft,
+                1: pw.Alignment.centerLeft,
+                2: pw.Alignment.centerRight,
+              },
+            ),
+            pw.SizedBox(height: 8),
+            pw.Container(
+              alignment: pw.Alignment.centerRight,
+              child: pw.Text(
+                'Total Decoration Charges: ${fmt(_decorationCharges.fold<double>(0, (s, d) => s + d.amount))}',
+                style: pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: 11,
+                  color: PdfColors.purple700,
+                ),
+              ),
+            ),
+            pw.SizedBox(height: 16),
+          ],
+
+          // === Expenses Section ===
+          if (_expenses.isNotEmpty) ...[
+            pw.Header(level: 1, text: 'Expenses'),
+            pw.SizedBox(height: 8),
+            pw.TableHelper.fromTextArray(
+              headers: ['Date', 'Category', 'Description', 'Amount'],
+              data: _expenses.map((e) {
+                final ds = DateFormat('yyyy-MM-dd').format(e.date);
+                return [ds, e.category, e.description, fmt(e.amount)];
+              }).toList(),
+              border: pw.TableBorder.all(
+                color: PdfColors.grey300, width: 0.5,
+              ),
+              headerStyle: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 10,
+                color: PdfColors.white,
+              ),
+              headerDecoration: pw.BoxDecoration(color: PdfColors.red800),
+              cellStyle: pw.TextStyle(fontSize: 9),
+              cellAlignments: {
+                0: pw.Alignment.centerLeft,
+                1: pw.Alignment.centerLeft,
+                2: pw.Alignment.centerLeft,
+                3: pw.Alignment.centerRight,
+              },
+            ),
+            pw.SizedBox(height: 8),
+            pw.Container(
+              alignment: pw.Alignment.centerRight,
+              child: pw.Text(
+                'Total Expenses: ${fmt(_totalExpenses)}',
+                style: pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: 11,
+                  color: PdfColors.red700,
+                ),
+              ),
+            ),
+            pw.SizedBox(height: 16),
+          ],
+
+          // === Summary ===
+          pw.Header(level: 1, text: 'Summary'),
+          pw.SizedBox(height: 8),
+          _summaryRow('Total Income (Payments + Decorations)', _totalIncome),
+          _summaryRow('Total Expenses', _totalExpenses, color: PdfColors.red),
+          pw.Divider(),
+          _summaryRow('Net Profit', _netProfit,
+              color: _netProfit >= 0 ? PdfColors.green : PdfColors.red,
+              bold: true),
+          pw.SizedBox(height: 20),
+
+          // === Profit Sharing ===
+          pw.Header(level: 1, text: 'Profit Sharing (50 / 50)'),
+          pw.SizedBox(height: 8),
+          _summaryRow('Raja Gopal (50%)', _netProfit / 2,
+              color: PdfColors.blue700, bold: true),
+          _summaryRow('Guru Prasad (50%)', _netProfit / 2,
+              color: PdfColors.teal700, bold: true),
+        ],
+      ),
+    );
+
+    // Save and share
+    final dir = await getTemporaryDirectory();
+    final fileName =
+        'Kusetty_Report_${_selectedMonth.year}_${_selectedMonth.month.toString().padLeft(2, '0')}.pdf';
+    final file = File('${dir.path}/$fileName');
+    await file.writeAsBytes(await pdf.save());
+
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      text: 'Kusetty Convention Hall — $monthLabel Report',
     );
   }
 
-  Color _getCategoryColor(String category) {
-    switch (category) {
-      case 'Electricity': return Colors.amber;
-      case 'Water': return Colors.blue;
-      case 'Maintenance': return Colors.brown;
-      case 'Staff Salary': return Colors.teal;
-      case 'Cleaning': return Colors.cyan;
-      case 'Decoration': return Colors.pink;
-      case 'Catering': return Colors.orange;
-      case 'Security': return Colors.indigo;
-      case 'Renovation': return Colors.deepOrange;
-      case 'Transport': return Colors.lime;
-      case 'Insurance': return Colors.purple;
-      default: return Colors.grey;
-    }
+  pw.Widget _summaryRow(String label, double amount,
+      {PdfColor? color, bool bold = false}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 3),
+      child: pw.Row(
+        children: [
+          pw.Expanded(
+            child: pw.Text(
+              label,
+              style: pw.TextStyle(
+                fontSize: 11,
+                fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+              ),
+            ),
+          ),
+          pw.Text(
+            '₹${_currencyFormat.format(amount)}',
+            style: pw.TextStyle(
+              fontSize: 11,
+              fontWeight: pw.FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

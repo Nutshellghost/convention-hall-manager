@@ -2,35 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/app_state.dart';
-import '../models/expense.dart';
-import 'dashboard_screen.dart';
+import '../models/decoration_charge.dart';
+import 'add_decoration_charge_screen.dart';
 
-class ExpensesScreen extends StatefulWidget {
-  const ExpensesScreen({super.key});
+class DecorationChargesScreen extends StatefulWidget {
+  const DecorationChargesScreen({super.key});
 
   @override
-  State<ExpensesScreen> createState() => _ExpensesScreenState();
+  State<DecorationChargesScreen> createState() => _DecorationChargesScreenState();
 }
 
-class _ExpensesScreenState extends State<ExpensesScreen> {
+class _DecorationChargesScreenState extends State<DecorationChargesScreen> {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AppState>().loadAllExpenses();
+      context.read<AppState>().loadAllDecorationCharges();
     });
   }
 
-  String _formatAmount(double amount) {
-    return NumberFormat('#,##0', 'en_IN').format(amount);
-  }
-
-  Future<void> _deleteExpense(Expense expense) async {
+  Future<void> _deleteCharge(DecorationCharge charge) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Expense'),
-        content: Text('Delete "${expense.description}" for ₹${_formatAmount(expense.amount)}?'),
+        title: const Text('Delete'),
+        content: Text('Delete decoration charge for ${charge.customerName}?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           FilledButton(
@@ -43,7 +39,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
 
     if (confirm == true) {
-      await context.read<AppState>().deleteExpense(expense.id!);
+      await context.read<AppState>().deleteDecorationCharge(charge.id!);
+      if (context.mounted) {
+        context.read<AppState>().loadAllDecorationCharges();
+      }
     }
   }
 
@@ -51,52 +50,53 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Expenses'),
+        title: const Text('Decoration Charges'),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const AddEditExpenseScreen()),
-            ).then((_) => context.read<AppState>().loadAllExpenses()),
+              MaterialPageRoute(builder: (_) => const AddDecorationChargeScreen()),
+            ).then((_) {
+              context.read<AppState>().loadAllDecorationCharges();
+            }),
           ),
         ],
       ),
       body: Consumer<AppState>(
         builder: (context, state, _) {
-          if (state.expenses.isEmpty) {
+          if (state.decorationCharges.isEmpty) {
             return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.receipt_long, size: 64, color: Colors.grey[300]),
+                  Icon(Icons.palette, size: 64, color: Colors.grey[300]),
                   const SizedBox(height: 12),
-                  Text('No expenses recorded', style: TextStyle(color: Colors.grey[500], fontSize: 16)),
+                  Text('No decoration charges', style: TextStyle(color: Colors.grey[500], fontSize: 16)),
                   const SizedBox(height: 8),
                   FilledButton.icon(
                     onPressed: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const AddEditExpenseScreen()),
-                    ).then((_) => context.read<AppState>().loadAllExpenses()),
+                      MaterialPageRoute(builder: (_) => const AddDecorationChargeScreen()),
+                    ).then((_) => context.read<AppState>().loadAllDecorationCharges()),
                     icon: const Icon(Icons.add),
-                    label: const Text('Add First Expense'),
+                    label: const Text('Add Decoration Charge'),
                   ),
                 ],
               ),
             );
           }
 
-          // Calculate total
-          final totalExpenses = state.expenses.fold<double>(0, (sum, e) => sum + e.amount);
+          final total = state.decorationCharges.fold<double>(0, (sum, c) => sum + c.amount);
 
           return RefreshIndicator(
-            onRefresh: () => state.loadAllExpenses(),
+            onRefresh: () => state.loadAllDecorationCharges(),
             child: ListView(
               padding: const EdgeInsets.all(8),
               children: [
                 // Total header
                 Card(
-                  color: Colors.red.withOpacity(0.05),
+                  color: Colors.purple.withOpacity(0.05),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Row(
@@ -104,19 +104,19 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.1),
+                            color: Colors.purple.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Icon(Icons.money_off, color: Colors.red, size: 28),
+                          child: const Icon(Icons.palette, color: Colors.purple, size: 28),
                         ),
                         const SizedBox(width: 16),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Total Expenses', style: TextStyle(color: Colors.grey[600])),
+                            Text('Total Decoration Charges', style: TextStyle(color: Colors.grey[600])),
                             Text(
-                              '₹${_formatAmount(totalExpenses)}',
-                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.red),
+                              '₹${NumberFormat('#,##0', 'en_IN').format(total)}',
+                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.purple),
                             ),
                           ],
                         ),
@@ -125,30 +125,27 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                ...state.expenses.map((expense) => Card(
+                ...state.decorationCharges.map((charge) => Card(
                   margin: const EdgeInsets.symmetric(vertical: 4),
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: _getCategoryColor(expense.category).withOpacity(0.2),
-                      child: Icon(
-                        _getCategoryIcon(expense.category),
-                        color: _getCategoryColor(expense.category),
-                      ),
+                      backgroundColor: Colors.purple.withOpacity(0.2),
+                      child: const Icon(Icons.palette, color: Colors.purple),
                     ),
-                    title: Text(expense.description, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    title: Text(charge.customerName, style: const TextStyle(fontWeight: FontWeight.w600)),
                     subtitle: Text(
-                      '${expense.category} • ${DateFormat('dd MMM yyyy').format(expense.date)}',
+                      DateFormat('dd MMM yyyy').format(charge.date),
                       style: TextStyle(color: Colors.grey[600], fontSize: 12),
                     ),
                     trailing: Text(
-                      '₹${_formatAmount(expense.amount)}',
-                      style: TextStyle(
+                      '₹${NumberFormat('#,##0', 'en_IN').format(charge.amount)}',
+                      style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
-                        color: Colors.red[700],
+                        color: Colors.purple,
                       ),
                     ),
-                    onLongPress: () => _deleteExpense(expense),
+                    onLongPress: () => _deleteCharge(charge),
                   ),
                 )),
               ],
@@ -157,21 +154,5 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         },
       ),
     );
-  }
-
-  Color _getCategoryColor(String category) {
-    switch (category) {
-      case 'Electricity': return Colors.amber;
-      case 'Renovation': return Colors.deepOrange;
-      default: return Colors.grey;
-    }
-  }
-
-  IconData _getCategoryIcon(String category) {
-    switch (category) {
-      case 'Electricity': return Icons.bolt;
-      case 'Renovation': return Icons.construction;
-      default: return Icons.receipt;
-    }
   }
 }

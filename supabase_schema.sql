@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   customer_name TEXT NOT NULL,
   phone TEXT NOT NULL,
   event_date TEXT NOT NULL,
+  booking_date TEXT,
   event_type TEXT NOT NULL,
   hall_name TEXT NOT NULL,
   start_time TEXT NOT NULL,
@@ -39,11 +40,20 @@ CREATE TABLE IF NOT EXISTS expenses (
   notes TEXT
 );
 
+CREATE TABLE IF NOT EXISTS decoration_charges (
+  id SERIAL PRIMARY KEY,
+  customer_name TEXT NOT NULL,
+  amount REAL NOT NULL,
+  date TEXT NOT NULL,
+  notes TEXT
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings(event_date);
 CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
 CREATE INDEX IF NOT EXISTS idx_payments_booking ON payments(booking_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
+CREATE INDEX IF NOT EXISTS idx_decoration_date ON decoration_charges(date);
 
 -- 2. RPC FUNCTIONS (used by the app for aggregate queries)
 
@@ -105,6 +115,7 @@ $$ LANGUAGE SQL;
 ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE decoration_charges ENABLE ROW LEVEL SECURITY;
 
 DO $$ 
 BEGIN
@@ -123,7 +134,15 @@ BEGIN
       USING (auth.role() = 'authenticated')
       WITH CHECK (auth.role() = 'authenticated');
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'decoration_charges' AND policyname = 'auth_all') THEN
+    CREATE POLICY auth_all ON decoration_charges
+      USING (auth.role() = 'authenticated')
+      WITH CHECK (auth.role() = 'authenticated');
+  END IF;
 END $$;
 
 -- 4. Enable auth users to sign up (email/password)
 -- This is enabled by default in Supabase Auth settings
+
+-- 5. Migration: Add booking_date column (run if upgrading from v1)
+-- ALTER TABLE bookings ADD COLUMN booking_date TEXT DEFAULT NULL;
