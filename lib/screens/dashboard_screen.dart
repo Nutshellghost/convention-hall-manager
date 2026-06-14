@@ -34,10 +34,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _loadMonthStats() async {
-    await Future.wait([
-      context.read<AppState>().loadMonthStats(_selectedYear, _selectedMonth),
-      context.read<AppState>().loadDashboard(),
-    ]);
+    await context.read<AppState>().loadMonthStats(_selectedYear, _selectedMonth);
   }
 
   void _previousMonth() {
@@ -117,7 +114,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               IconButton(
                 icon: const Icon(Icons.refresh),
                 onPressed: () {
-                  state.loadDashboard();
                   _loadMonthStats();
                 },
               ),
@@ -131,10 +127,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ? const Center(child: CircularProgressIndicator())
               : RefreshIndicator(
                   onRefresh: () async {
-                    await Future.wait([
-                      state.loadDashboard(),
-                      _loadMonthStats(),
-                    ]);
+                    await _loadMonthStats();
                   },
                   child: ListView(
                     padding: const EdgeInsets.all(16),

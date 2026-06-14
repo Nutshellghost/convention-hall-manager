@@ -75,7 +75,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Month-specific stats
+  // Month-specific stats (with upcoming count)
   Future<void> loadMonthStats(int year, int month) async {
     try {
       final results = await Future.wait([
@@ -88,6 +88,7 @@ class AppState extends ChangeNotifier {
           DateTime(year, month + 1, 0),
         ),
         _db.getDecorationChargesForMonth(year, month),
+        _db.getUpcomingBookingsCount(),
       ]);
 
       _monthRevenue = results[0] as double;
@@ -95,6 +96,7 @@ class AppState extends ChangeNotifier {
       final decorationList = results[2] as List<DecorationCharge>;
       _monthDecoration = decorationList.fold<double>(0, (sum, c) => sum + c.amount);
       _monthNetProfit = _monthRevenue + _monthDecoration - _monthExpenses;
+      _upcomingCount = results[3] as int;
       notifyListeners();
     } catch (e) {
       debugPrint('Error loading month stats: $e');
