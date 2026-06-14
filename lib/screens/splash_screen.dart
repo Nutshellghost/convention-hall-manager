@@ -91,15 +91,7 @@ class _SplashScreenState extends State<SplashScreen>
         width: double.infinity,
         height: double.infinity,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              theme.colorScheme.primary.withOpacity(0.15),
-              Colors.white,
-              Colors.white,
-            ],
-          ),
+          color: const Color(0xFFC8C7CD),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -116,19 +108,15 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                 );
               },
-              child: Container(
-                width: 200,
-                height: 200,
-                child: ClipOval(
-                  child: Image.asset(
+              child: Image.asset(
                     'assets/logo.png',
-                    fit: BoxFit.cover,
+                    width: 280,
+                    height: 280,
+                    fit: BoxFit.contain,
                     errorBuilder: (context, error, stackTrace) =>
                         Icon(Icons.meeting_room,
                             size: 80, color: theme.colorScheme.primary),
                   ),
-                ),
-              ),
             ),
             const SizedBox(height: 60),
             // Loading indicator
