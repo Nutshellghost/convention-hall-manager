@@ -1,6 +1,13 @@
+import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_state.dart';
 import '../models/booking.dart';
 import '../models/payment.dart';
@@ -20,6 +27,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   List<Payment> _payments = [];
   double _totalPaid = 0;
   bool _loading = true;
+  final _cardKey = GlobalKey();
 
   @override
   void initState() {
@@ -59,6 +67,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       appBar: AppBar(
         title: const Text('Booking Details'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.share),
+            tooltip: 'Share on WhatsApp',
+            onPressed: () => _shareWhatsApp(booking),
+          ),
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () {
@@ -139,7 +152,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     const Divider(height: 24),
                     _buildInfoRow(Icons.event, 'Event Type', booking.eventType),
                     _buildInfoRow(Icons.location_city, 'Hall', booking.hallName),
-                    _buildInfoRow(Icons.calendar_today, 'Date', DateFormat('dd MMM yyyy').format(booking.eventDate)),
+                    _buildInfoRow(Icons.calendar_today, 'Function Date', DateFormat('dd MMM yyyy').format(booking.eventDate)),
                     _buildInfoRow(Icons.access_time, 'Time', '${booking.startTime} - ${booking.endTime}'),
                     if (booking.notes != null && booking.notes!.isNotEmpty)
                       _buildInfoRow(Icons.notes, 'Notes', booking.notes!),
@@ -467,6 +480,59 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     }
   }
 
+  Future<void> _shareWhatsApp(Booking booking) async {
+    // Show a brief preview then capture
+    final dateStr = DateFormat('dd MMM yyyy').format(booking.eventDate);
+    final fmt = NumberFormat('#,##0', 'en_IN');
+
+    final graffitiCard = _GraffitiBookingCard(
+      booking: booking,
+      dateStr: dateStr,
+      fmt: fmt,
+    );
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => RepaintBoundary(
+        key: _cardKey,
+        child: graffitiCard,
+      ),
+    );
+
+    // Wait for the dialog to render
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    try {
+      final boundary = _cardKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary == null) throw Exception('No boundary');
+
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) throw Exception('No bytes');
+
+      final dir = await getTemporaryDirectory();
+      final file = File(
+          '${dir.path}/booking_${booking.id}_${DateTime.now().millisecondsSinceEpoch}.png');
+      await file.writeAsBytes(byteData.buffer.asUint8List());
+
+      if (context.mounted) Navigator.pop(context); // close dialog
+
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: '🎉 Booking Confirmed - Kusetty Convention Hall',
+      );
+    } catch (e) {
+      if (context.mounted) Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Share failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   Future<void> _deleteBooking(Booking booking) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -488,5 +554,268 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       await context.read<AppState>().deleteBooking(booking.id!);
       if (context.mounted) Navigator.pop(context);
     }
+  }
+}
+
+// =========================================================================
+// Graffiti-style Booking Confirmation Card (shared as image)
+// =========================================================================
+
+class _GraffitiBookingCard extends StatelessWidget {
+  final Booking booking;
+  final String dateStr;
+  final NumberFormat fmt;
+
+  const _GraffitiBookingCard({
+    required this.booking,
+    required this.dateStr,
+    required this.fmt,
+  });
+
+  Color _statusColor() {
+    switch (booking.status) {
+      case 'completed': return const Color(0xFF00E676);
+      case 'cancelled': return const Color(0xFFFF5252);
+      default: return const Color(0xFFFFD740);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      child: Container(
+        width: 420,
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF1A1A2E),
+              Color(0xFF16213E),
+              Color(0xFF0F3460),
+              Color(0xFF1A1A2E),
+            ],
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // === Spray dots decoration ===
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(8, (i) => _sprayDot()),
+            ),
+            const SizedBox(height: 16),
+
+            // === Logo ===
+            ClipOval(
+              child: Image.asset(
+                'assets/logo.png',
+                width: 70,
+                height: 70,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Icon(
+                  Icons.meeting_room,
+                  size: 50,
+                  color: Colors.cyanAccent,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // === Title - Graffiti style ===
+            ShaderMask(
+              shaderCallback: (bounds) => const LinearGradient(
+                colors: [Color(0xFFFF6EC7), Color(0xFFFFD740), Color(0xFF00E5FF)],
+              ).createShader(bounds),
+              child: const Text(
+                'BOOKING\nCONFIRMED',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: 4,
+                  height: 1.1,
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Kusetty Convention Hall',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.cyanAccent.withOpacity(0.8),
+                letterSpacing: 3,
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // === Customer highlight strip ===
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                border: Border(
+                  left: BorderSide(color: Colors.pinkAccent, width: 4),
+                ),
+              ),
+              child: Text(
+                booking.customerName,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // === Details ===
+            _graffitiRow(Icons.event, 'Function', dateStr),
+            const SizedBox(height: 8),
+            _graffitiRow(Icons.access_time, 'Time', '${booking.startTime} - ${booking.endTime}'),
+            const SizedBox(height: 8),
+            _graffitiRow(Icons.location_city, 'Hall', booking.hallName),
+            const SizedBox(height: 8),
+            _graffitiRow(Icons.theater_comedy, 'Event', booking.eventType),
+
+            const Divider(color: Colors.white24, height: 24),
+
+            // === Amounts ===
+            Row(
+              children: [
+                Expanded(child: _amountBox('Total', booking.totalAmount, const Color(0xFF00E5FF))),
+                const SizedBox(width: 8),
+                Expanded(child: _amountBox('Advance', booking.advanceAmount, const Color(0xFFFF6EC7))),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // === Status badge ===
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              decoration: BoxDecoration(
+                border: Border.all(color: _statusColor(), width: 2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                booking.status.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: _statusColor(),
+                  letterSpacing: 3,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // === Tagline ===
+            Text(
+              '#MomentsMadeMemorable',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey.withOpacity(0.5),
+                letterSpacing: 2,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // === Bottom spray dots ===
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(8, (i) => _sprayDot()),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sprayDot() {
+    final colors = [
+      Colors.pinkAccent,
+      Colors.cyanAccent,
+      Colors.amberAccent,
+      Colors.limeAccent,
+    ];
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        color: colors[DateTime.now().millisecondsSinceEpoch % 4].withOpacity(0.3),
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+
+  Widget _graffitiRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.cyanAccent.withOpacity(0.7)),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 65,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey.withOpacity(0.6),
+              letterSpacing: 1,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _amountBox(String label, double amount, Color accent) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: accent.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: accent.withOpacity(0.8),
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '₹${fmt.format(amount)}',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: accent,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

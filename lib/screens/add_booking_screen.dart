@@ -25,8 +25,8 @@ class _AddBookingScreenState extends State<AddBookingScreen> {
   DateTime _eventDate = DateTime.now();
   final _eventTypeController = TextEditingController();
   String _hallName = 'Main Hall';
-  String _startTime = '09:00';
-  String _endTime = '12:00';
+  String _startTime = '06:00';
+  String _endTime = '17:00';
   bool _loading = false;
 
   final List<String> _hallNames = [
