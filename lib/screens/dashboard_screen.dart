@@ -224,7 +224,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             child: _buildStatCard(
                               context,
                               'Total Revenue',
-                              '₹${_formatAmount(state.monthRevenue)}',
+                              '₹${_formatAmount(state.monthRevenue + state.monthDecoration - state.monthExpenses)}',
                               Icons.account_balance_wallet,
                               Colors.green,
                             ),
@@ -240,14 +240,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 12),
-                      _buildStatCard(
-                        context,
-                        'Net Profit',
-                        '₹${_formatAmount(state.monthNetProfit)}',
-                        Icons.trending_up,
-                        state.monthNetProfit >= 0 ? Colors.teal : Colors.red,
                       ),
                       const SizedBox(height: 20),
 
