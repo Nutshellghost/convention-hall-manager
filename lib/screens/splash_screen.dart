@@ -60,10 +60,6 @@ class _SplashScreenState extends State<SplashScreen>
     final session = Supabase.instance.client.auth.currentSession;
     if (!mounted) return;
 
-    if (session != null) {
-      context.read<AppState>().loadDashboard();
-    }
-
     // Navigate after 3 seconds total
     await Future.delayed(const Duration(milliseconds: 200));
 
