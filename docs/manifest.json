@@ -1,16 +1,13 @@
 {
-    "name": "Kusetty Convention Hall",
-    "short_name": "Convention Hall",
+    "name": "convention_hall_manager",
+    "short_name": "convention_hall_manager",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#C8C7CD",
-    "theme_color": "#6A1B9A",
-    "description": "Manage bookings, payments, expenses & reports for Kusetty Convention Hall.",
+    "background_color": "#0175C2",
+    "theme_color": "#0175C2",
+    "description": "A new Flutter project.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
-    "categories": ["business", "productivity"],
-    "lang": "en",
-    "scope": "/",
     "icons": [
         {
             "src": "icons/Icon-192.png",
@@ -34,6 +31,5 @@
             "type": "image/png",
             "purpose": "maskable"
         }
-    ],
-    "splash_pages": null
+    ]
 }
