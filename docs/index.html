@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Kusetty Convention Hall — manage bookings, payments, expenses & reports">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#6A1B9A">
+
+  <!-- iOS PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Convention Hall">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-startup-image" href="icons/Icon-512.png" media="(device-width: 414px)">
+
+  <!-- Android PWA -->
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Kusetty Convention Hall</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Prevent FOUC -->
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #C8C7CD;
+      overflow: hidden;
+    }
+    #loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      color: #6A1B9A;
+      font-family: -apple-system, sans-serif;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">Loading...</div>
+  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    // Hide loading splash once Flutter boots
+    window.addEventListener('flutter-first-frame', () => {
+      document.getElementById('loading').style.display = 'none';
+    });
+  </script>
+</body>
+</html>
