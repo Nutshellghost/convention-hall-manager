@@ -151,7 +151,8 @@ class AppState extends ChangeNotifier {
     if (payment.type == 'advance') {
       final booking = await _db.getBooking(payment.bookingId);
       if (booking != null) {
-        final totalAdvance = booking.advanceAmount + payment.amount;
+        // Sum all advance payments from DB instead of double-counting
+        final totalAdvance = await _db.getTotalPaymentsForBooking(payment.bookingId);
         await _db.updateBooking(booking.copyWith(advanceAmount: totalAdvance));
       }
     }

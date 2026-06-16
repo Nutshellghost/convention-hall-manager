@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/app_state.dart';
-import '../models/booking.dart';
 import '../models/expense.dart';
 import 'add_booking_screen.dart';
 import 'login_screen.dart';
@@ -34,7 +33,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _loadMonthStats() async {
-    await context.read<AppState>().loadMonthStats(_selectedYear, _selectedMonth);
+    try {
+      await context.read<AppState>().loadMonthStats(_selectedYear, _selectedMonth);
+    } catch (e) {
+      // Handled inside AppState
+    }
   }
 
   void _previousMonth() {
@@ -61,24 +64,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadMonthStats();
   }
 
-  Future<String> _getUserEmail() async {
-    final user = Supabase.instance.client.auth.currentUser;
-    return user?.email ?? 'Unknown';
-  }
-
   Future<void> _logout(BuildContext context) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('Sign Out'),
         content: const Text('Are you sure you want to sign out?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Sign Out'),
           ),
@@ -103,185 +101,183 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppState>(
-      builder: (context, state, _) {
-        final monthLabel =
-            DateFormat('MMMM yyyy').format(DateTime(_selectedYear, _selectedMonth));
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Kusetty Convention Hall'),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () {
-                  _loadMonthStats();
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.logout),
-                onPressed: () => _logout(context),
-              ),
-            ],
+    final monthLabel =
+        DateFormat('MMMM yyyy').format(DateTime(_selectedYear, _selectedMonth));
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Kusetty Convention Hall'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadMonthStats,
           ),
-          body: state.loading
-              ? const Center(child: CircularProgressIndicator())
-              : RefreshIndicator(
-                  onRefresh: () async {
-                    await _loadMonthStats();
-                  },
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      // Month slider
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.chevron_left),
-                                onPressed: _previousMonth,
-                              ),
-                              Text(
-                                monthLabel,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.bold),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.chevron_right),
-                                onPressed: _nextMonth,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => _logout(context),
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await _loadMonthStats();
+        },
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // Month slider — static
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: _previousMonth,
+                    ),
+                    Text(
+                      monthLabel,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: _nextMonth,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
 
-                      // Welcome header
-                      Card(
-                        child: Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.purple.shade700,
-                                Colors.purple.shade400,
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Convention Hall Manager',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleLarge
-                                    ?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Manage bookings, payments & expenses',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(color: Colors.white70),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Month stat cards 2x2 grid
-                      InkWell(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const BookingsScreen()),
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        child: _buildStatCard(
-                          context,
-                          'Upcoming Functions',
-                          '${state.upcomingCount}',
-                          Icons.event_available,
-                          Colors.orange,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildStatCard(
-                              context,
-                              'Total Revenue',
-                              '₹${_formatAmount(state.monthRevenue + state.monthDecoration - state.monthExpenses)}',
-                              Icons.account_balance_wallet,
-                              Colors.green,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildStatCard(
-                              context,
-                              'Total Expenses',
-                              '₹${_formatAmount(state.monthExpenses)}',
-                              Icons.money_off,
-                              Colors.red,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Quick actions
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildQuickAction(
-                              context,
-                              Icons.add_circle,
-                              'New Booking',
-                              Colors.purple,
-                              () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => const AddBookingScreen()),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildQuickAction(
-                              context,
-                              Icons.palette,
-                              'Decoration',
-                              Colors.blue,
-                              () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) =>
-                                        const DecorationChargesScreen()),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
+            // Welcome header — static
+            Card(
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.purple.shade700,
+                      Colors.purple.shade400,
                     ],
                   ),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-        );
-      },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Convention Hall Manager',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Manage bookings, payments & expenses',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Stat cards — ONLY these consume AppState
+            Consumer<AppState>(
+              builder: (ctx, state, _) => Column(
+                children: [
+                  InkWell(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const BookingsScreen()),
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    child: _buildStatCard(
+                      context,
+                      'Upcoming Functions',
+                      '${state.upcomingCount}',
+                      Icons.event_available,
+                      Colors.orange,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatCard(
+                          context,
+                          'Total Revenue',
+                          '₹${_formatAmount(state.monthRevenue + state.monthDecoration)}',
+                          Icons.account_balance_wallet,
+                          Colors.green,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatCard(
+                          context,
+                          'Total Expenses',
+                          '₹${_formatAmount(state.monthExpenses)}',
+                          Icons.money_off,
+                          Colors.red,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Quick actions — static
+            Row(
+              children: [
+                Expanded(
+                  child: _buildQuickAction(
+                    context,
+                    Icons.add_circle,
+                    'New Booking',
+                    Colors.purple,
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const AddBookingScreen()),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildQuickAction(
+                    context,
+                    Icons.palette,
+                    'Decoration',
+                    Colors.blue,
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) =>
+                              const DecorationChargesScreen()),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
     );
   }
 
@@ -295,7 +291,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, color: color, size: 28),
@@ -341,49 +337,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 8),
               Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBookingCard(BuildContext context, Booking booking) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          child: Text(
-            booking.customerName[0].toUpperCase(),
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        title:
-            Text(booking.customerName, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text('${booking.eventType} • ${booking.startTime}-${booking.endTime}'),
-        trailing: Chip(
-          label: Text(booking.status.toUpperCase()),
-          backgroundColor: booking.status == 'confirmed'
-              ? Colors.orange.withOpacity(0.2)
-              : booking.status == 'completed'
-                  ? Colors.green.withOpacity(0.2)
-                  : Colors.red.withOpacity(0.2),
-          labelStyle: TextStyle(
-            fontSize: 11,
-            color: booking.status == 'confirmed'
-                ? Colors.orange[800]
-                : booking.status == 'completed'
-                    ? Colors.green[800]
-                    : Colors.red[800],
-          ),
-        ),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => BookingDetailScreen(bookingId: booking.id!),
           ),
         ),
       ),
@@ -487,7 +440,6 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
                     lastDate: DateTime(2030),
                   );
                   if (picked != null) {
-                    // UTC fix: preserve the selected date regardless of timezone
                     setState(() => _selectedDate = DateTime(
                           picked.year,
                           picked.month,
@@ -504,16 +456,13 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.notes),
                 ),
-                maxLines: 2,
+                maxLines: 3,
               ),
               const SizedBox(height: 24),
               FilledButton.icon(
-                onPressed: _saveExpense,
+                onPressed: _submit,
                 icon: const Icon(Icons.save),
                 label: const Text('Save Expense'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
               ),
             ],
           ),
@@ -522,24 +471,32 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
     );
   }
 
-  Future<void> _saveExpense() async {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final expense = Expense(
-      category: _category,
-      description: _descriptionController.text.trim(),
-      amount: double.parse(_amountController.text.trim()),
-      date: _selectedDate,
-      notes:
-          _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
-    );
-
-    await context.read<AppState>().addExpense(expense);
-    if (context.mounted) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Expense added successfully')),
+    try {
+      final expense = Expense(
+        category: _category,
+        description: _descriptionController.text.trim(),
+        amount: double.parse(_amountController.text),
+        date: _selectedDate,
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
       );
+      await context.read<AppState>().addExpense(expense);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Expense added')),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 }

@@ -282,16 +282,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     ),
                     Text(date, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
                     const SizedBox(width: 12),
-                    SizedBox(
-                      width: 100,
-                      child: Text(
-                        '₹${_currencyFormat.format(amount)}',
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: Colors.green,
-                          fontSize: 13,
-                        ),
+                    Text(
+                      '₹${_currencyFormat.format(amount)}',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.green,
+                        fontSize: 13,
                       ),
                     ),
                   ],
@@ -356,16 +353,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     ),
                     Text(dateStr, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
                     const SizedBox(width: 12),
-                    SizedBox(
-                      width: 100,
-                      child: Text(
-                        '₹${_currencyFormat.format(d.amount)}',
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: Colors.purple,
-                          fontSize: 13,
-                        ),
+                    Text(
+                      '₹${_currencyFormat.format(d.amount)}',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.purple,
+                        fontSize: 13,
                       ),
                     ),
                   ],
@@ -440,16 +434,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     ),
                     Text(dateStr, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
                     const SizedBox(width: 12),
-                    SizedBox(
-                      width: 100,
-                      child: Text(
-                        '₹${_currencyFormat.format(e.amount)}',
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: Colors.red,
-                          fontSize: 13,
-                        ),
+                    Text(
+                      '₹${_currencyFormat.format(e.amount)}',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.red,
+                        fontSize: 13,
                       ),
                     ),
                   ],
@@ -589,7 +580,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               alignment: pw.Alignment.centerRight,
               child: pw.Text(
                 'Kusetty Convention Hall — $shortMonth | Page ${ctx.pageNumber}',
-                style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey500),
+                style: pw.TextStyle(fontSize: 7, color: PdfColors.grey500),
               ),
             );
           },
@@ -603,11 +594,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
               children: [
                 pw.Text(
                   'Kusetty Convention Hall',
-                  style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey500),
+                  style: pw.TextStyle(fontSize: 7, color: PdfColors.grey500),
                 ),
                 pw.Text(
                   'Generated ${DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now())}',
-                  style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey500),
+                  style: pw.TextStyle(fontSize: 7, color: PdfColors.grey500),
                 ),
               ],
             ),
@@ -698,12 +689,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   final method = p['payment_method'] as String? ?? 'cash';
                   return [date, customer, event, payType, method.toUpperCase(), fmt((p['amount'] as num).toDouble())];
                 }).toList(),
-                border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
-                headerStyle: const pw.TextStyle(
+                border: null,
+                headerStyle: pw.TextStyle(
                   fontWeight: pw.FontWeight.bold, fontSize: 8, color: PdfColors.white,
                 ),
                 headerDecoration: const pw.BoxDecoration(color: PdfColors.green800),
-                cellStyle: const pw.TextStyle(fontSize: 8),
+                cellStyle: pw.TextStyle(fontSize: 8),
                 columnWidths: {
                   0: const pw.FlexColumnWidth(0.6),
                   1: const pw.FlexColumnWidth(1.2),
@@ -726,7 +717,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 alignment: pw.Alignment.centerRight,
                 child: pw.Text(
                   'Subtotal: ${fmt(_paymentsWithBookings.fold<double>(0, (s, p) => s + (p['amount'] as num).toDouble()))}',
-                  style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.green700),
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.green700),
                 ),
               ),
               pw.SizedBox(height: 16),
@@ -744,12 +735,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     '${pct.toStringAsFixed(1)}%',
                   ];
                 }).toList(),
-                border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
-                headerStyle: const pw.TextStyle(
+                border: null,
+                headerStyle: pw.TextStyle(
                   fontWeight: pw.FontWeight.bold, fontSize: 9, color: PdfColors.white,
                 ),
                 headerDecoration: const pw.BoxDecoration(color: PdfColors.teal700),
-                cellStyle: const pw.TextStyle(fontSize: 9),
+                cellStyle: pw.TextStyle(fontSize: 9),
                 columnWidths: {
                   0: const pw.FlexColumnWidth(1),
                   1: const pw.FlexColumnWidth(1),
@@ -773,12 +764,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 data: _decorationCharges.map((d) {
                   return [DateFormat('dd MMM').format(d.date), d.customerName, fmt(d.amount)];
                 }).toList(),
-                border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
-                headerStyle: const pw.TextStyle(
+                border: null,
+                headerStyle: pw.TextStyle(
                   fontWeight: pw.FontWeight.bold, fontSize: 9, color: PdfColors.white,
                 ),
                 headerDecoration: const pw.BoxDecoration(color: PdfColors.purple700),
-                cellStyle: const pw.TextStyle(fontSize: 9),
+                cellStyle: pw.TextStyle(fontSize: 9),
                 columnWidths: {
                   0: const pw.FlexColumnWidth(0.6),
                   1: const pw.FlexColumnWidth(1.6),
@@ -795,7 +786,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 alignment: pw.Alignment.centerRight,
                 child: pw.Text(
                   'Subtotal: ${fmt(decorationTotal)}',
-                  style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.purple700),
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.purple700),
                 ),
               ),
               pw.SizedBox(height: 16),
@@ -810,12 +801,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 data: _expenses.map((e) {
                   return [DateFormat('dd MMM').format(e.date), e.category, e.description, fmt(e.amount)];
                 }).toList(),
-                border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
-                headerStyle: const pw.TextStyle(
+                border: null,
+                headerStyle: pw.TextStyle(
                   fontWeight: pw.FontWeight.bold, fontSize: 9, color: PdfColors.white,
                 ),
                 headerDecoration: const pw.BoxDecoration(color: PdfColors.red800),
-                cellStyle: const pw.TextStyle(fontSize: 9),
+                cellStyle: pw.TextStyle(fontSize: 9),
                 columnWidths: {
                   0: const pw.FlexColumnWidth(0.6),
                   1: const pw.FlexColumnWidth(0.8),
@@ -834,7 +825,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 alignment: pw.Alignment.centerRight,
                 child: pw.Text(
                   'Subtotal: ${fmt(_totalExpenses)}',
-                  style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.red700),
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.red700),
                 ),
               ),
               pw.SizedBox(height: 16),
@@ -906,13 +897,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
-                          pw.Text('Signature: ___________________', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey500)),
+                          pw.Text('Signature: ___________________', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey500)),
                         ],
                       ),
                       pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
-                          pw.Text('Signature: ___________________', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey500)),
+                          pw.Text('Signature: ___________________', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey500)),
                         ],
                       ),
                     ],
@@ -960,7 +951,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
           child: pw.Text(
             '$label: $value',
-            style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+            style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
           ),
         ),
       ],
@@ -976,7 +967,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       ),
       child: pw.Text(
         title,
-        style: const pw.TextStyle(
+        style: pw.TextStyle(
           fontSize: 11,
           fontWeight: pw.FontWeight.bold,
           color: PdfColors.grey800,

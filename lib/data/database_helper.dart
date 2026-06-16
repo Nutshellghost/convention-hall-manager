@@ -34,9 +34,17 @@ class DatabaseHelper {
     return booking.id!;
   }
 
+  /// Deletes a booking and its payments atomically via Supabase RPC.
+  /// Falls back to sequential delete if RPC doesn't exist.
   Future<int> deleteBooking(int id) async {
-    await _client.from('payments').delete().eq('booking_id', id);
-    await _client.from('bookings').delete().eq('id', id);
+    try {
+      // Prefer atomic RPC so a failure doesn't orphan data.
+      await _client.rpc('delete_booking_cascade', params: {'p_id': id});
+    } catch (_) {
+      // Fallback: sequential delete (non-atomic but handles most cases).
+      await _client.from('payments').delete().eq('booking_id', id);
+      await _client.from('bookings').delete().eq('id', id);
+    }
     return id;
   }
 
@@ -59,7 +67,8 @@ class DatabaseHelper {
   }
 
   Future<List<Booking>> getBookingsForDate(DateTime date) async {
-    final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final dateStr =
+        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     final data = await _client
         .from('bookings')
         .select()
@@ -193,8 +202,10 @@ class DatabaseHelper {
   }
 
   Future<double> getTotalExpensesForPeriod(DateTime start, DateTime end) async {
-    final startStr = '${start.year}-${start.month.toString().padLeft(2, '0')}-${start.day.toString().padLeft(2, '0')}';
-    final endStr = '${end.year}-${end.month.toString().padLeft(2, '0')}-${end.day.toString().padLeft(2, '0')}';
+    final startStr =
+        '${start.year}-${start.month.toString().padLeft(2, '0')}-${start.day.toString().padLeft(2, '0')}';
+    final endStr =
+        '${end.year}-${end.month.toString().padLeft(2, '0')}-${end.day.toString().padLeft(2, '0')}';
     final result = await _client.rpc('get_total_expenses_for_period', params: {
       'p_start': startStr,
       'p_end': endStr,
@@ -203,8 +214,10 @@ class DatabaseHelper {
   }
 
   Future<double> getTotalPaymentsForPeriod(DateTime start, DateTime end) async {
-    final startStr = '${start.year}-${start.month.toString().padLeft(2, '0')}-${start.day.toString().padLeft(2, '0')}';
-    final endStr = '${end.year}-${end.month.toString().padLeft(2, '0')}-${end.day.toString().padLeft(2, '0')}';
+    final startStr =
+        '${start.year}-${start.month.toString().padLeft(2, '0')}-${start.day.toString().padLeft(2, '0')}';
+    final endStr =
+        '${end.year}-${end.month.toString().padLeft(2, '0')}-${end.day.toString().padLeft(2, '0')}';
     final result = await _client.rpc('get_total_payments_for_period', params: {
       'p_start': startStr,
       'p_end': endStr,
@@ -212,7 +225,8 @@ class DatabaseHelper {
     return ((result ?? 0) as num).toDouble();
   }
 
-  Future<List<Map<String, dynamic>>> getPaymentsWithBookingDetails(int year, int month) async {
+  Future<List<Map<String, dynamic>>> getPaymentsWithBookingDetails(
+      int year, int month) async {
     final monthStr = month.toString().padLeft(2, '0');
     final data = await _client
         .from('payments')
@@ -262,7 +276,8 @@ class DatabaseHelper {
     }
   }
 
-  Future<List<DecorationCharge>> getDecorationChargesForMonth(int year, int month) async {
+  Future<List<DecorationCharge>> getDecorationChargesForMonth(
+      int year, int month) async {
     try {
       final monthStr = month.toString().padLeft(2, '0');
       final data = await _client
@@ -317,9 +332,10 @@ class DatabaseHelper {
   }
 
   // === DELETE ALL DATA ===
+  // Uses separate delete calls; an RPC wrapping all four is preferred
+  // but these sequential deletes respect FK ordering.
 
   Future<void> deleteAllData() async {
-    // Order matters: payments FK references bookings, so delete payments first
     await _client.from('payments').delete().neq('id', 0);
     await _client.from('bookings').delete().neq('id', 0);
     await _client.from('expenses').delete().neq('id', 0);
@@ -330,7 +346,8 @@ class DatabaseHelper {
 
   Future<int> getUpcomingBookingsCount() async {
     final today = DateTime.now();
-    final dateStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    final dateStr =
+        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
     final response = await _client
         .from('bookings')
         .select('id')

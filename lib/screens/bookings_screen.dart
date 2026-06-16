@@ -191,7 +191,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
                                         style: TextStyle(color: Colors.grey[600], fontSize: 13),
                                       ),
                                       Text(
-                                        '${booking.startTime}-${booking.endTime}',
+                                        '📞 ${booking.phone}  •  ${booking.startTime}-${booking.endTime}',
                                         style: TextStyle(color: Colors.grey[500], fontSize: 12),
                                       ),
                                     ],
